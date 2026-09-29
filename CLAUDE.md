@@ -49,3 +49,8 @@ usually within a minute.
   the camera notch or the home indicator.
 - The same page is also published as a Claude artifact. The artifact build is the page
   without `<html>`/`<head>`; `tools/build.py` writes both.
+
+## Matches recorded before uploads
+`data/manual-matches.csv` and `data/manual-player-results.csv` hold two matches from
+2026-09-29 that were played before uploads were connected. Once the Google Sheet is set up,
+paste these rows into its `Matches` and `Player results` tabs.
