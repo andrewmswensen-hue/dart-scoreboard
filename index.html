@@ -1,0 +1,3053 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Darts">
+<meta name="description" content="Darts scoreboard for X01 and Cricket with computer opponents, statistics and the One Bust, Low Score house rule.">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png" sizes="192x192">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Dart Scoreboard</title>
+<style>
+/* Layout: one centered phone column (max 480px), floating pill tab bar, full-screen game view.
+   Dark-first palette from the brief; light variant for System/Light themes. */
+:root {
+  --page: #000; --header: #1c1c1e; --card: #2c2c2e; --card2: #3a3a3c; --text: #fff; --muted: #8e8e93;
+  --sep: #3a3a3c; --key: #3a3a3c; --key-text: #fff; --box: #000; --box-text: #fff;
+  --green: #4f9f5a; --green-btn: #3f9d4b; --red: #e53935; --amber: #f5a623; --on-amber: #1c1c1e;
+  --bot: #ff9500; --accent: #30d158; --accent-soft: rgba(48, 209, 88, .18); --bar: #5ccb6b;
+  --seg-bg: #1c1c1e; --seg-sel: #636366; --tab-bg: rgba(28, 28, 30, .94); --overlay: rgba(0, 0, 0, .6);
+  --grid: rgba(255, 255, 255, .14); --danger: #ff6961; --on-color: #fff; --shadow: 0 10px 30px rgba(0, 0, 0, .5);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-app-theme="dark"]) {
+    --page: #f2f2f7; --header: #fff; --card: #fff; --card2: #ececf1; --text: #000; --muted: #6c6c70;
+    --sep: #d1d1d6; --key: #e5e5ea; --key-text: #000; --box: #1c1c1e; --box-text: #fff;
+    --green: #3f8f4a; --green-btn: #34843f; --red: #d32f2f; --bot: #b35900; --accent: #1f8a3b;
+    --accent-soft: rgba(31, 138, 59, .14); --bar: #2e9e48; --seg-bg: #e3e3e8; --seg-sel: #fff;
+    --tab-bg: rgba(255, 255, 255, .95); --overlay: rgba(0, 0, 0, .35); --grid: rgba(0, 0, 0, .12);
+    --danger: #c62828; --shadow: 0 10px 30px rgba(0, 0, 0, .15); color-scheme: light;
+  }
+}
+:root[data-theme="light"]:not([data-app-theme="dark"]), :root[data-app-theme="light"] {
+  --page: #f2f2f7; --header: #fff; --card: #fff; --card2: #ececf1; --text: #000; --muted: #6c6c70;
+  --sep: #d1d1d6; --key: #e5e5ea; --key-text: #000; --box: #1c1c1e; --box-text: #fff;
+  --green: #3f8f4a; --green-btn: #34843f; --red: #d32f2f; --bot: #b35900; --accent: #1f8a3b;
+  --accent-soft: rgba(31, 138, 59, .14); --bar: #2e9e48; --seg-bg: #e3e3e8; --seg-sel: #fff;
+  --tab-bg: rgba(255, 255, 255, .95); --overlay: rgba(0, 0, 0, .35); --grid: rgba(0, 0, 0, .12);
+  --danger: #c62828; --shadow: 0 10px 30px rgba(0, 0, 0, .15); color-scheme: light;
+}
+:root[data-app-theme="dark"] { color-scheme: dark; }
+
+/* Safe areas: installed on a phone (standalone), keep a small extra buffer
+   clear of the camera notch and the home indicator. */
+:root { --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px); }
+@media (display-mode: standalone) {
+  :root { --safe-t: calc(env(safe-area-inset-top, 0px) + 8px); --safe-b: calc(env(safe-area-inset-bottom, 0px) + 6px); }
+  .notch-shim { display: block; }
+}
+.notch-shim { display: none; position: fixed; top: 0; left: 0; right: 0; height: var(--safe-t); background: #000; z-index: 45; pointer-events: none; }
+html { height: 100%; box-sizing: border-box; background: var(--page); padding-top: var(--safe-t); }
+*, *::before, *::after { box-sizing: border-box; }
+body { min-height: 100%; margin: 0; background: var(--page); color: var(--text); font-family: var(--font); font-size: 15px;
+  -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; padding: 0; }
+button:disabled { cursor: not-allowed; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.bot-name { color: var(--bot) !important; }
+.num { font-variant-numeric: tabular-nums; }
+svg { display: block; }
+
+/* ---------- app shell ---------- */
+.app { max-width: 480px; margin: 0 auto; padding-inline: 16px; padding-block: 8px calc(110px + var(--safe-b)); }
+.topbar { position: sticky; top: var(--safe-t); z-index: 5; display: grid; grid-template-columns: 44px 1fr 44px;
+  align-items: center; min-height: 56px; margin-inline: -16px; padding-inline: 16px; background: var(--page); }
+.topbar h1 { margin: 0; text-align: center; font-size: 17px; font-weight: 700; }
+.home-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 10px 14px; }
+.home-head h1 { margin: 0; font-size: clamp(28px, 8.5vw, 34px); font-weight: 800; letter-spacing: -.02em; }
+.circle-btn { width: 44px; height: 44px; border-radius: 50%; background: var(--green-btn); color: var(--on-color);
+  display: grid; place-items: center; flex: none; }
+.circle-btn svg { width: 22px; height: 22px; }
+.icon-plain { width: 44px; height: 44px; display: grid; place-items: center; color: var(--muted); border-radius: 12px; flex: none; }
+.icon-plain svg { width: 22px; height: 22px; }
+.section-h { font-size: 22px; font-weight: 800; margin: 26px 0 12px; }
+
+/* ---------- segmented ---------- */
+.seg { display: flex; background: var(--seg-bg); border-radius: 999px; padding: 3px; gap: 2px; margin-block: 6px 14px; }
+.seg button { flex: 1; min-height: 38px; border-radius: 999px; font-weight: 700; font-size: 15px; color: var(--text); }
+.seg button[aria-pressed="true"] { background: var(--seg-sel); box-shadow: 0 1px 3px rgba(0, 0, 0, .25); }
+.seg.small button { font-size: 13px; min-height: 34px; }
+
+/* ---------- home tiles ---------- */
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; }
+.tile-wrap { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tile-wrap.full { grid-column: 1 / -1; }
+.tile-wrap.span2 { grid-column: span 2; }
+.tile-label { font-size: 13px; font-weight: 700; color: var(--text); padding-left: 4px; }
+.tile { min-height: 58px; border-radius: 16px; color: var(--on-color); font-weight: 800; font-size: 17px; line-height: 1.15;
+  padding: 6px 8px; display: grid; place-items: center; text-align: center; overflow-wrap: anywhere; }
+.tile.green { background: var(--green); }
+.tile.red { background: var(--red); }
+.tile.amber { background: var(--amber); color: var(--on-amber); }
+.tile.off { opacity: .9; }
+.format-note { color: var(--muted); font-size: 13px; margin: 10px 4px 0; }
+.btn-start { width: 100%; min-height: 56px; margin-top: 18px; border-radius: 999px; background: var(--red); color: var(--on-color);
+  font-size: 20px; font-weight: 800; letter-spacing: .08em; }
+.btn-start:disabled { opacity: .45; }
+.hint { color: var(--muted); font-size: 13px; text-align: center; margin: 8px 0 0; }
+.home-actions { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+.check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 700; flex: 1; min-width: 0; cursor: pointer; }
+.check input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; margin: 0; }
+.pill-btn { min-height: 44px; padding: 0 16px; border-radius: 999px; display: inline-flex; align-items: center; gap: 8px; font-weight: 700;
+  background: var(--card); color: var(--text); white-space: nowrap; }
+.pill-btn.green { background: var(--green-btn); color: var(--on-color); }
+.pill-btn.red { background: var(--red); color: var(--on-color); }
+.pill-btn.amber { background: var(--amber); color: var(--on-amber); }
+.pill-btn svg { width: 20px; height: 20px; flex: none; }
+.sq-btn { width: 48px; height: 44px; border-radius: 999px; background: var(--green-btn); color: var(--on-color); display: grid; place-items: center; flex: none; }
+.sq-btn svg { width: 24px; height: 24px; }
+.resume-card { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: 16px; padding: 12px 14px; margin-bottom: 14px; }
+.resume-card > div { flex: 1; min-width: 0; }
+.resume-card strong { display: block; }
+.resume-card span { color: var(--muted); font-size: 13px; }
+
+/* ---------- lists ---------- */
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.row { display: flex; align-items: center; gap: 8px; min-height: 56px; padding: 4px 4px 4px 12px; background: var(--card); border-radius: 14px;
+  position: relative; touch-action: pan-y; }
+.row.dragging { z-index: 3; box-shadow: var(--shadow); transition: none; opacity: .95; }
+.row.shift { transition: transform .15s ease; }
+.row .dart-ic { width: 26px; height: 26px; color: var(--muted); flex: none; }
+.row .dart-ic.on { color: var(--accent); }
+.row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; text-align: left; min-height: 48px; }
+.row-name { font-weight: 800; font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-sub { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drag-handle { width: 44px; height: 44px; display: grid; place-items: center; color: var(--muted); touch-action: none; cursor: grab; flex: none; border-radius: 10px; }
+.drag-handle svg { width: 22px; height: 22px; }
+.empty { text-align: center; color: var(--muted); background: var(--card); border-radius: 16px; padding: 28px 18px; }
+.empty strong { display: block; color: var(--text); font-size: 17px; margin-bottom: 6px; }
+.empty svg { width: 40px; height: 40px; margin: 0 auto 10px; color: var(--muted); }
+
+/* ---------- tab bar ---------- */
+.tabbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(8px + var(--safe-b)); z-index: 20;
+  width: min(448px, calc(100% - 24px)); display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; padding: 6px;
+  background: var(--tab-bg); border-radius: 30px; box-shadow: var(--shadow); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 52px; border-radius: 24px;
+  color: var(--muted); font-size: 11px; font-weight: 700; }
+.tab svg { width: 24px; height: 24px; }
+.tab[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
+.tab span { white-space: nowrap; }
+
+/* ---------- tables ---------- */
+.stat-h { text-align: center; font-size: 22px; font-weight: 800; margin: 28px 0 10px; }
+.stat-h .info-btn { display: inline-grid; vertical-align: middle; width: 30px; height: 30px; margin-left: 4px; color: var(--muted); place-items: center; }
+.stat-h .info-btn svg { width: 20px; height: 20px; }
+.table-wrap { overflow-x: auto; border-radius: 12px; }
+table.stat { width: 100%; border-collapse: collapse; font-size: 15px; table-layout: fixed; }
+table.stat th { background: var(--header); color: var(--muted); font-weight: 600; font-size: 13px; padding: 10px 4px; text-align: center; }
+table.stat th:first-child { text-align: left; padding-left: 10px; width: 34%; }
+table.stat td { padding: 11px 4px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+table.stat td:first-child { text-align: left; padding-left: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+table.stat tbody tr:nth-child(odd) { background: var(--card); }
+table.stat tbody tr:nth-child(even) { background: var(--card2); }
+.pidx { color: var(--muted); font-size: 12px; font-weight: 600; margin-right: 4px; }
+.no-data { background: var(--card); border-radius: 12px; padding: 18px; text-align: center; color: var(--muted); }
+.popover { background: var(--card2); border-radius: 12px; padding: 12px 14px; color: var(--text); font-size: 13px; line-height: 1.45; margin: 0 0 10px; }
+.chart-card { background: var(--card); border-radius: 14px; padding: 12px 8px 8px; margin-bottom: 12px; }
+.chart-card h3 { margin: 0 0 6px 6px; font-size: 16px; font-weight: 800; }
+.chart-scroll { overflow-x: auto; }
+.chart-scroll svg text { font-family: var(--font); }
+
+/* ---------- games ---------- */
+.filters { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+.filters .seg { flex: 1; margin: 0; }
+.select { min-height: 40px; border-radius: 12px; background: var(--card); border: 0; padding: 0 10px; max-width: 45%; }
+.game-item { background: var(--card); border-radius: 16px; overflow: hidden; }
+.gi-main { display: block; width: 100%; text-align: left; padding: 12px 14px 8px; }
+.gi-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.chip { display: inline-block; font-size: 12px; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: var(--card2); color: var(--text); }
+.chip.amber { background: var(--amber); color: var(--on-amber); }
+.chip.green { background: var(--accent-soft); color: var(--accent); }
+.chip.muted { color: var(--muted); }
+.gi-settings { font-weight: 700; margin-top: 6px; }
+.gi-players { color: var(--muted); font-size: 14px; margin-top: 2px; }
+.gi-result { margin-top: 6px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.gi-result svg { width: 18px; height: 18px; color: var(--amber); }
+.gi-actions { display: flex; justify-content: flex-end; gap: 6px; padding: 0 8px 8px; }
+
+/* ---------- settings ---------- */
+.group { background: var(--card); border-radius: 14px; overflow: hidden; margin-bottom: 18px; }
+.group-title { color: var(--muted); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin: 20px 6px 8px; }
+.srow { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 14px; width: 100%; text-align: left; }
+.srow + .srow { border-top: 1px solid var(--sep); }
+.srow .grow { flex: 1; min-width: 0; }
+.srow .grow small { display: block; color: var(--muted); font-size: 12px; }
+.srow.danger { color: var(--danger); font-weight: 700; }
+.switch { position: relative; width: 51px; height: 31px; flex: none; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+.switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--card2); transition: background .15s; }
+.switch span::after { content: ""; position: absolute; width: 27px; height: 27px; top: 2px; left: 2px; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: transform .15s; }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::after { transform: translateX(20px); }
+.switch input:focus-visible + span { outline: 3px solid var(--accent); outline-offset: 2px; }
+.switch.amber input:checked + span { background: var(--amber); }
+
+/* ---------- sheets and dialogs ---------- */
+.overlay { position: fixed; inset: 0; z-index: 50; background: var(--overlay); display: flex; align-items: flex-end; justify-content: center; }
+.sheet { width: 100%; max-width: 480px; max-height: 88vh; max-height: 88dvh; overflow-y: auto; background: var(--header); border-radius: 22px 22px 0 0;
+  padding: 8px 16px calc(18px + var(--safe-b)); box-shadow: var(--shadow); animation: up .18s ease-out; }
+@keyframes up { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sheet, .toast { animation: none !important; } .row.shift, .switch span, .switch span::after { transition: none; } }
+.grabber { width: 38px; height: 5px; border-radius: 3px; background: var(--card2); margin: 2px auto 8px; }
+.sheet-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.sheet-head h2 { flex: 1; margin: 0; font-size: 20px; font-weight: 800; }
+.sheet p { line-height: 1.45; }
+.opt-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.opt-grid.cols7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.opt { min-height: 48px; border-radius: 12px; background: var(--card); font-weight: 800; font-size: 16px; padding: 4px; }
+.opt[aria-pressed="true"] { background: var(--green); color: var(--on-color); }
+.opt.red[aria-pressed="true"] { background: var(--red); }
+.opt:disabled { opacity: .3; }
+.opt-list { display: flex; flex-direction: column; gap: 8px; }
+.opt-list .opt { text-align: left; padding: 10px 14px; }
+.opt-list .opt small { display: block; font-weight: 500; color: inherit; opacity: .75; font-size: 13px; margin-top: 2px; }
+.field { display: flex; flex-direction: column; gap: 6px; margin-block: 12px; }
+.field label, .field .lbl { font-size: 13px; font-weight: 700; color: var(--muted); }
+.input { min-height: 46px; border-radius: 12px; border: 1px solid var(--sep); background: var(--card); padding: 0 12px; width: 100%; }
+textarea.input { padding: 10px 12px; min-height: 140px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+.inline { display: flex; gap: 8px; align-items: center; }
+.inline .input { flex: 1; min-width: 0; }
+.btn-row { display: flex; gap: 10px; margin-top: 16px; }
+.btn-row > * { flex: 1; justify-content: center; }
+.stepper { display: flex; align-items: center; gap: 10px; }
+.stepper button { width: 44px; height: 44px; border-radius: 12px; background: var(--card); font-size: 22px; font-weight: 800; }
+.stepper output { min-width: 28px; text-align: center; font-weight: 800; font-size: 20px; }
+.rule-list { margin: 8px 0; padding-left: 20px; color: var(--text); font-size: 14px; line-height: 1.5; }
+.rule-list li + li { margin-top: 4px; }
+.dialog-wrap { position: fixed; inset: 0; z-index: 60; background: var(--overlay); display: grid; place-items: center; padding: 16px; }
+.dialog { width: 100%; max-width: 360px; background: var(--header); border-radius: 18px; padding: 20px; box-shadow: var(--shadow); }
+.dialog h2 { margin: 0 0 8px; font-size: 19px; }
+.dialog p { margin: 0; color: var(--muted); line-height: 1.45; }
+.dialog .btn-row { flex-wrap: wrap; }
+.toast-root { position: fixed; left: 0; right: 0; top: calc(64px + var(--safe-t)); z-index: 80; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; padding-inline: 16px; }
+.toast { background: var(--card2); color: var(--text); border-radius: 14px; padding: 11px 16px; font-weight: 700; box-shadow: var(--shadow); max-width: 440px; text-align: center; animation: up .2s ease-out; }
+.toast.amber { background: var(--amber); color: var(--on-amber); }
+.toast.red { background: var(--red); color: var(--on-color); }
+.test-row { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--sep); font-size: 14px; }
+.test-row b { flex: none; width: 44px; }
+.test-row .ok { color: var(--accent); }
+.test-row .bad { color: var(--danger); }
+.test-row small { display: block; color: var(--muted); }
+
+/* ---------- game screen ---------- */
+.game { position: fixed; inset: 0; z-index: 30; background: var(--page); padding-top: var(--safe-t); padding-bottom: var(--safe-b); }
+.game-inner { max-width: 480px; height: 100%; margin: 0 auto; display: flex; flex-direction: column; }
+.game-top { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; padding: 4px 8px; min-height: 50px; }
+.game-title { text-align: center; line-height: 1.2; min-width: 0; }
+.game-title strong { display: block; font-size: 15px; }
+.game-title span { color: var(--muted); font-size: 12px; }
+.banner { margin: 0 12px 6px; border-radius: 14px; background: var(--amber); color: var(--on-amber); padding: 8px 12px; font-weight: 800; }
+.banner .tracker { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; font-size: 12px; }
+.banner .tracker span { border-radius: 999px; padding: 2px 8px; border: 1.5px solid currentColor; }
+.banner .tracker span.done { opacity: .5; text-decoration: line-through; }
+.banner .tracker span.now { background: var(--on-amber); color: var(--amber); border-color: var(--on-amber); }
+.cards { flex: 1; overflow-y: auto; padding: 2px 12px 8px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.pcard { position: relative; background: var(--card); border-radius: 18px; padding: 12px 12px 12px 18px; display: grid;
+  grid-template-columns: minmax(0, 1.1fr) auto minmax(0, .95fr); gap: 10px; align-items: center; overflow: hidden; }
+.pcard.active::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 7px; background: var(--accent); }
+.pc-left { min-width: 0; }
+.pc-score { font-size: clamp(42px, 13vw, 62px); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.pc-name { color: var(--muted); font-weight: 700; font-size: 15px; margin-top: 4px; display: flex; align-items: center; gap: 4px; min-width: 0; }
+.pc-name span.nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-name svg { width: 16px; height: 16px; flex: none; color: var(--accent); }
+.pc-hr { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; color: var(--muted); font-weight: 700; flex-wrap: wrap; }
+.pip { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--amber); display: inline-block; }
+.pip.on { background: var(--amber); }
+.lock-tag { display: inline-flex; align-items: center; gap: 3px; color: var(--amber); font-weight: 800; }
+.lock-tag svg { width: 14px; height: 14px; }
+.pc-mid { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.boxes { display: flex; gap: 5px; }
+.dbox { width: 40px; height: 40px; border-radius: 9px; background: var(--box); color: var(--box-text); display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+.dbox.dim { opacity: .55; }
+.boxes.bust .dbox { box-shadow: inset 0 0 0 2px var(--red); }
+.tbox { height: 40px; min-width: 130px; border-radius: 9px; background: var(--box); color: var(--box-text); display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+.pc-total { font-weight: 800; color: var(--muted); font-size: 16px; min-height: 20px; font-variant-numeric: tabular-nums; }
+.pc-total.bust { color: var(--danger); }
+.pc-right { font-size: 14px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; min-width: 0; }
+.pc-right .lbl { color: var(--muted); font-weight: 600; }
+.pc-right b { font-weight: 800; font-variant-numeric: tabular-nums; }
+.pc-right .kv { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.pc-right svg { width: 16px; height: 16px; color: var(--muted); }
+.pcard.compact { grid-template-columns: minmax(0, 1fr) auto auto; padding: 8px 12px 8px 18px; border-radius: 14px; }
+.pcard.compact .pc-score { font-size: 30px; }
+.pcard.compact .pc-name { margin-top: 0; font-size: 13px; }
+.pcard.compact .dbox { width: 28px; height: 28px; font-size: 11px; border-radius: 7px; }
+.pcard.compact .tbox { height: 28px; min-width: 80px; }
+.pcard.compact .pc-total { font-size: 13px; min-height: 0; }
+.pcard.compact .pc-right { font-size: 12px; gap: 2px; }
+.pcard.compact .pc-mid { gap: 2px; }
+.pcard.winner { box-shadow: inset 0 0 0 2px var(--accent); }
+
+.cboard { background: var(--card); border-radius: 18px; overflow: hidden; }
+.crow { display: grid; grid-template-columns: 58px repeat(var(--cols), minmax(0, 1fr)); align-items: center; min-height: 38px; }
+.crow + .crow { border-top: 1px solid var(--sep); }
+.crow.head { align-items: stretch; background: var(--header); }
+.crow.dead { opacity: .35; }
+.cnum { font-weight: 800; text-align: center; font-size: 17px; }
+.cmark { display: grid; place-items: center; color: var(--text); }
+.cmark svg { width: 26px; height: 26px; }
+.cplayer { padding: 8px 4px; text-align: center; min-width: 0; border-top: 4px solid transparent; }
+.cplayer.active { border-top-color: var(--accent); background: var(--accent-soft); }
+.cplayer .nm { font-weight: 800; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; justify-content: center; align-items: center; gap: 3px; }
+.cplayer .nm svg { width: 13px; height: 13px; color: var(--accent); flex: none; }
+.cplayer .pts { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.cplayer .sub { font-size: 11px; color: var(--muted); font-weight: 700; }
+.turn-strip { display: flex; align-items: center; gap: 10px; margin: 0 12px 6px; padding: 8px 12px; background: var(--card); border-radius: 14px; }
+.turn-strip .who { flex: 1; min-width: 0; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.input-panel { padding: 6px 12px 8px; background: var(--page); border-top: 1px solid var(--sep); display: flex; flex-direction: column; gap: 6px; }
+.suggest { min-height: 22px; text-align: center; font-weight: 800; color: var(--accent); font-size: 15px; }
+.suggest.muted { color: var(--muted); font-weight: 700; }
+.suggest.amber { color: var(--amber); }
+.mult { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.mult button { min-height: 40px; border-radius: 10px; background: var(--key); color: var(--key-text); font-weight: 800; }
+.mult button[aria-pressed="true"] { background: var(--accent); color: #000; }
+.mult button.triple[aria-pressed="true"] { background: var(--red); color: #fff; }
+.pad { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.pad.cricket { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pad.keypad { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.key { min-height: 44px; border-radius: 10px; background: var(--key); color: var(--key-text); font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; }
+.key:active:not(:disabled) { transform: scale(.96); }
+.key:disabled { opacity: .35; }
+.key.span2 { grid-column: span 2; }
+.key.span3 { grid-column: span 3; }
+.key.green { background: var(--green-btn); color: var(--on-color); }
+.key.miss { color: var(--danger); }
+.total-display { text-align: center; font-size: 32px; font-weight: 800; min-height: 42px; font-variant-numeric: tabular-nums; background: var(--card); border-radius: 12px; }
+.total-display.placeholder { color: var(--muted); font-size: 16px; display: grid; place-items: center; }
+.actions { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+.actions button { min-height: 44px; border-radius: 12px; background: var(--card); font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; }
+.actions button svg { width: 18px; height: 18px; }
+.actions .lock { background: var(--amber); color: var(--on-amber); }
+.actions .more { max-width: 56px; justify-self: end; width: 100%; }
+.actions button:disabled { opacity: .4; }
+.bot-note { text-align: center; color: var(--muted); font-weight: 700; padding: 8px; background: var(--card); border-radius: 12px; }
+
+/* ---------- match detail ---------- */
+.card { background: var(--card); border-radius: 16px; padding: 14px; margin-bottom: 12px; }
+.leg-line { display: flex; gap: 10px; padding: 10px 0; border-top: 1px solid var(--sep); font-size: 14px; }
+.leg-line:first-child { border-top: 0; }
+.leg-line .lno { color: var(--muted); font-weight: 700; flex: none; width: 70px; }
+details.turns { background: var(--card); border-radius: 14px; margin-bottom: 10px; overflow: hidden; }
+details.turns summary { padding: 12px 14px; font-weight: 800; cursor: pointer; min-height: 44px; }
+.trow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto 44px; gap: 8px; align-items: center; padding: 4px 6px 4px 14px; border-top: 1px solid var(--sep); font-size: 14px; }
+.trow .tn { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trow .td { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.trow .ts { font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.flag { font-size: 11px; font-weight: 800; border-radius: 6px; padding: 1px 5px; margin-left: 4px; }
+.flag.bust { background: var(--red); color: #fff; }
+.flag.lock { background: var(--amber); color: var(--on-amber); }
+.flag.final { background: var(--card2); }
+.flag.co { background: var(--accent-soft); color: var(--accent); }
+.cards > * { flex: none; }
+@media (max-height: 740px) {
+  .key { min-height: 38px; font-size: 16px; }
+  .mult button { min-height: 34px; }
+  .actions button { min-height: 40px; }
+  .pad { gap: 5px; }
+  .input-panel { gap: 5px; padding-block: 4px 6px; }
+  .suggest { min-height: 18px; font-size: 14px; }
+  .game-top { min-height: 44px; }
+}
+@media (max-width: 360px) {
+  .actions button:not(.more) svg { display: none; }
+  .actions button { font-size: 13px; }
+  .game-title span { font-size: 11px; }
+}
+.counters { display: flex; flex-wrap: wrap; gap: 2px 10px; }
+@media (max-width: 400px) {
+  .pcard { gap: 8px; padding-left: 16px; grid-template-columns: minmax(0, 1fr) auto minmax(0, .9fr); }
+  .pc-score { font-size: 44px; }
+  .dbox { width: 32px; height: 32px; font-size: 12px; border-radius: 7px; }
+  .boxes { gap: 4px; }
+  .tbox { min-width: 104px; height: 32px; }
+  .pc-right { font-size: 13px; }
+  .pcard.compact .pc-score { font-size: 26px; }
+  .pcard.compact .kv-darts { display: none; }
+  .pcard.compact .dbox { width: 24px; height: 24px; font-size: 10px; }
+  .pcard.compact .tbox { min-width: 70px; height: 24px; }
+}
+.pc-score.d4 { font-size: clamp(32px, 9vw, 46px); }
+@media (max-width: 360px) {
+  .pc-score { font-size: 36px; }
+  .pc-score.d4 { font-size: 28px; }
+  .pcard { grid-template-columns: minmax(0, 1fr) auto minmax(0, .8fr); gap: 6px; padding-right: 8px; }
+}
+.saved-note { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; color: var(--muted); font-size: 13px; font-weight: 600; margin: 12px 0 0; }
+.saved-note svg { width: 16px; height: 16px; color: var(--accent); }
+.link-btn { color: var(--accent); font-weight: 800; min-height: 32px; text-decoration: underline; text-underline-offset: 3px; }
+button, .key { touch-action: manipulation; }
+.game { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+
+</style>
+</head>
+<body>
+<div class="notch-shim" aria-hidden="true"></div>
+<div id="screen-root"></div>
+<div id="sheet-root"></div>
+<div id="dialog-root"></div>
+<div id="toast-root" class="toast-root" aria-live="polite"></div>
+<script>
+/* ==========================================================================
+   DART SCOREBOARD: PURE LOGIC (no DOM access in this section)
+   --------------------------------------------------------------------------
+   PLAN
+   Data model: store raw input, derive everything else.
+     Match  = { id, createdAt, updatedAt, endedAt, status, mode, settings,
+                players[{id,name,isBot,skill}], legs[{ events[] }], winnerId }
+     Event  = {t:'d',s,m} one dart | {t:'tot',v,n} turn total | {t:'end'} end
+              turn early | {t:'lock'} house rule Lock In.
+     replayMatch(match) rebuilds every derived field (turn log per leg, leg
+     winners, result type, locks, final scores, set and leg counts, live
+     state) from the raw events. Undo pops the last event, Edit replaces the
+     events of one turn, and both simply replay. Autosave stores only raw
+     events (compact strings) so history stays small.
+   Actions: dart, total, end, lock, undo, editTurn, restartLeg.
+   House rule state machine per leg:
+     normal play -> (manual Lock In | bust beyond allowance = auto-lock)
+     -> final round (each other seat once, in seat order after the locker)
+     -> resolution (lowest remaining; ties to locker, then earlier thrower).
+     A valid checkout ends the leg at any moment, including the final round.
+   Stat formulas (pure, (matches, filter) -> numbers, zero-safe):
+     3-dart average = points / darts * 3. First-9 = first three turns of each
+     leg, points / darts * 3. Double % and Triple % = hits / tracked darts.
+     Checkout % = checkouts / darts thrown while one dart could finish.
+     MPR = marks / darts * 3.
+   ========================================================================== */
+const DL = (() => {
+  'use strict';
+
+  /* ---------- constants ---------- */
+  const APP_VERSION = '1.0.0';
+  const BOARD_ORDER = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
+  // Regulation board radii in millimetres.
+  const RINGS = { innerBull: 6.35, outerBull: 15.9, tripleIn: 99, tripleOut: 107, doubleIn: 162, doubleOut: 170 };
+  const X01_POINTS = [101, 201, 301, 401, 501, 601, 701, 801, 901, 1001];
+  const IMPOSSIBLE_CHECKOUTS = [169, 168, 166, 165, 163, 162, 159];
+  const SKILL_NAMES = ['', 'Beginner', 'Amateur', 'Intermediate', 'Advanced', 'Pro'];
+  const SKILL_TARGET_AVG = [0, 25, 40, 55, 70, 90];
+  // Gaussian spread (mm, per axis) calibrated by simulation to the averages above.
+  const SKILL_SIGMA = [0, 35, 22, 15.4, 11.2, 7.6];
+  const CRICKET_DEFAULT = [20, 19, 18, 17, 16, 15, 25];
+
+  /* ---------- darts ---------- */
+  function dartValue(s, m) {
+    if (!s || !m) return 0;
+    if (s === 25) return m === 2 ? 50 : 25;
+    return s * m;
+  }
+  function validDart(d) {
+    if (!d || typeof d.s !== 'number' || typeof d.m !== 'number') return false;
+    if (d.s === 0) return d.m === 0;
+    if (d.s === 25) return d.m === 1 || d.m === 2;
+    return Number.isInteger(d.s) && d.s >= 1 && d.s <= 20 && (d.m === 1 || d.m === 2 || d.m === 3);
+  }
+  const isDoubleDart = (d) => !!d && d.s > 0 && d.m === 2;
+  const isTripleDart = (d) => !!d && d.s > 0 && d.m === 3;
+  function dartLabel(d) {
+    if (!d) return '';
+    if (d.total) return '·';
+    if (!d.s) return 'M';
+    if (d.s === 25) return d.m === 2 ? 'Bull' : '25';
+    return (d.m === 2 ? 'D' : d.m === 3 ? 'T' : '') + d.s;
+  }
+  function parseDartLabel(str) {
+    if (str === 'Bull') return { s: 25, m: 2 };
+    if (str === '25') return { s: 25, m: 1 };
+    if (str === 'M') return { s: 0, m: 0 };
+    const m = str[0] === 'T' ? 3 : str[0] === 'D' ? 2 : 1;
+    const s = parseInt(/^[SDT]/.test(str) ? str.slice(1) : str, 10);
+    return { s, m };
+  }
+
+  const ALL_DARTS = (() => {
+    const a = [];
+    for (let s = 1; s <= 20; s++) a.push({ s, m: 1 }, { s, m: 2 }, { s, m: 3 });
+    a.push({ s: 25, m: 1 }, { s: 25, m: 2 });
+    return a;
+  })();
+
+  const POSSIBLE_TOTALS = (() => {
+    const vals = [0, ...new Set(ALL_DARTS.map((d) => dartValue(d.s, d.m)))];
+    const set = new Set();
+    for (const a of vals) for (const b of vals) for (const c of vals) set.add(a + b + c);
+    return set;
+  })();
+  const isPossibleTotal = (v) => Number.isInteger(v) && v >= 0 && v <= 180 && POSSIBLE_TOTALS.has(v);
+
+  const neededWins = (format, n) => (format === 'bestOf' ? Math.ceil(n / 2) : n);
+
+  /* ---------- checkout routes ---------- */
+  function finishOk(d, rule) {
+    if (!d || !d.s) return false;
+    if (rule === 'straight') return true;
+    if (rule === 'double') return d.m === 2;
+    return d.m === 2 || d.m === 3; // master
+  }
+  function setupCost(d) {
+    if (d.m === 3) {
+      const t = { 20: 0, 19: 1, 18: 2, 17: 3, 16: 3.5, 15: 4, 14: 4.5, 13: 5, 12: 5.5, 11: 6, 10: 6.5 };
+      return t[d.s] !== undefined ? t[d.s] : 7 + (10 - d.s) * 0.2;
+    }
+    if (d.m === 1) {
+      if (d.s === 25) return 5;
+      return 4 + (20 - d.s) * 0.15;
+    }
+    if (d.s === 25) return 6;
+    return 9 + (20 - d.s) * 0.1;
+  }
+  const DOUBLE_PREF = { 20: 0, 16: 0.5, 8: 2, 18: 2, 12: 3, 10: 3, 4: 4, 14: 5, 6: 5, 2: 6, 25: 6, 19: 7, 17: 7, 15: 7, 13: 8, 11: 8, 9: 8, 7: 9, 5: 9, 3: 10, 1: 12 };
+  function finishCost(d, rule) {
+    if (d.m === 2) return DOUBLE_PREF[d.s];
+    if (rule === 'master') return 3 + setupCost(d);
+    return setupCost(d);
+  }
+  const FINISH_BY_VALUE = {};
+  for (const rule of ['straight', 'double', 'master']) {
+    const map = new Map();
+    for (const d of ALL_DARTS) {
+      if (!finishOk(d, rule)) continue;
+      const v = dartValue(d.s, d.m);
+      if (!map.has(v)) map.set(v, []);
+      map.get(v).push(d);
+    }
+    FINISH_BY_VALUE[rule] = map;
+  }
+  const routeMemo = new Map();
+  // Fewest darts first, then the most conventional route by cost.
+  function searchRoute(rem, rule, maxDarts) {
+    const key = rem + '|' + rule + '|' + maxDarts;
+    if (routeMemo.has(key)) return routeMemo.get(key);
+    let best = null;
+    if (rem >= 1 && rem <= 180 && !(rule !== 'straight' && rem < 2)) {
+      const fin = FINISH_BY_VALUE[rule];
+      for (let k = 1; k <= maxDarts && !best; k++) {
+        let bestCost = Infinity;
+        const consider = (route, cost) => { if (cost < bestCost) { bestCost = cost; best = route; } };
+        if (k === 1) {
+          for (const f of fin.get(rem) || []) consider([f], finishCost(f, rule));
+        } else if (k === 2) {
+          for (const a of ALL_DARTS) {
+            const need = rem - dartValue(a.s, a.m);
+            if (need < 1) continue;
+            for (const f of fin.get(need) || []) consider([a, f], (a.m === 3 ? 2 : 1) * setupCost(a) + finishCost(f, rule));
+          }
+        } else {
+          for (const a of ALL_DARTS) {
+            const va = dartValue(a.s, a.m);
+            for (const b of ALL_DARTS) {
+              const vb = dartValue(b.s, b.m);
+              const need = rem - va - vb;
+              if (need < 1) continue;
+              for (const f of fin.get(need) || []) {
+                consider([a, b, f], (a.m === 3 ? 2 : 1) * setupCost(a) + setupCost(b) + finishCost(f, rule) + (vb > va ? 0.05 : 0));
+              }
+            }
+          }
+        }
+      }
+    }
+    routeMemo.set(key, best);
+    return best;
+  }
+  const routeString = (route) => route.map(dartLabel).join(' ');
+
+  // Standard Double Out routes (three darts available), 2 to 170.
+  // prettier-ignore
+  const CHECKOUT_TABLE = {
+    170:'T20 T20 Bull', 167:'T20 T19 Bull', 164:'T20 T18 Bull', 161:'T20 T17 Bull', 160:'T20 T20 D20',
+    158:'T20 T20 D19', 157:'T20 T19 D20', 156:'T20 T20 D18', 155:'T20 T19 D19', 154:'T20 T18 D20',
+    153:'T20 T19 D18', 152:'T20 T20 D16', 151:'T20 T17 D20', 150:'T20 T18 D18', 149:'T20 T19 D16',
+    148:'T20 T16 D20', 147:'T20 T17 D18', 146:'T20 T18 D16', 145:'T20 T15 D20', 144:'T20 T20 D12',
+    143:'T20 T17 D16', 142:'T20 T14 D20', 141:'T20 T19 D12', 140:'T20 T20 D10', 139:'T20 T13 D20',
+    138:'T20 T18 D12', 137:'T20 T19 D10', 136:'T20 T20 D8', 135:'T20 T17 D12', 134:'T20 T14 D16',
+    133:'T20 T19 D8', 132:'T20 T20 D6', 131:'T20 T13 D16', 130:'T20 T18 D8', 129:'T20 T19 D6',
+    128:'T20 T20 D4', 127:'T20 T17 D8', 126:'T20 T18 D6', 125:'T20 T19 D4', 124:'T20 T16 D8',
+    123:'T20 T13 D12', 122:'T20 T18 D4', 121:'T20 T15 D8', 120:'T20 20 D20', 119:'T20 19 D20',
+    118:'T20 18 D20', 117:'T20 17 D20', 116:'T20 16 D20', 115:'T20 15 D20', 114:'T20 14 D20', 113:'T20 13 D20',
+    112:'T20 20 D16', 111:'T20 19 D16', 110:'T20 Bull', 109:'T20 17 D16', 108:'T20 16 D16', 107:'T19 Bull',
+    106:'T20 14 D16', 105:'T20 13 D16', 104:'T18 Bull', 103:'T20 11 D16', 102:'T20 10 D16', 101:'T17 Bull',
+    100:'T20 D20', 99:'T20 7 D16', 98:'T20 D19', 97:'T19 D20', 96:'T20 D18', 95:'T19 D19', 94:'T18 D20',
+    93:'T19 D18', 92:'T20 D16', 91:'T17 D20', 90:'T18 D18', 89:'T19 D16', 88:'T20 D14', 87:'T17 D18',
+    86:'T18 D16', 85:'T19 D14', 84:'T20 D12', 83:'T17 D16', 82:'Bull D16', 81:'T19 D12', 80:'T20 D10',
+    79:'T13 D20', 78:'T18 D12', 77:'T19 D10', 76:'T20 D8', 75:'T17 D12', 74:'T18 D10', 73:'T19 D8',
+    72:'T20 D6', 71:'T17 D10', 70:'T18 D8', 69:'T19 D6', 68:'T20 D4', 67:'T17 D8', 66:'Bull D8', 65:'25 D20',
+    64:'T20 D2', 63:'T17 D6', 62:'T18 D4', 61:'25 D18', 60:'20 D20', 59:'19 D20', 58:'18 D20', 57:'17 D20',
+    56:'16 D20', 55:'15 D20', 54:'14 D20', 53:'13 D20', 52:'20 D16', 51:'19 D16', 50:'Bull', 49:'17 D16',
+    48:'16 D16', 47:'15 D16', 46:'14 D16', 45:'13 D16', 44:'12 D16', 43:'11 D16', 42:'10 D16', 41:'9 D16',
+    40:'D20', 39:'7 D16', 38:'D19', 37:'5 D16', 36:'D18', 35:'19 D8', 34:'D17', 33:'17 D8', 32:'D16',
+    31:'15 D8', 30:'D15', 29:'13 D8', 28:'D14', 27:'11 D8', 26:'D13', 25:'9 D8', 24:'D12', 23:'7 D8', 22:'D11',
+    21:'5 D8', 20:'D10', 19:'3 D8', 18:'D9', 17:'1 D8', 16:'D8', 15:'7 D4', 14:'D7', 13:'5 D4', 12:'D6',
+    11:'3 D4', 10:'D5', 9:'1 D4', 8:'D4', 7:'3 D2', 6:'D3', 5:'1 D2', 4:'D2', 3:'1 D1', 2:'D1',
+  };
+
+  function checkoutRoute(rem, rule, dartsLeft) {
+    if (dartsLeft < 1 || rem < 1) return null;
+    if (rule === 'double' && dartsLeft === 3) {
+      const s = CHECKOUT_TABLE[rem];
+      return s ? s.split(' ').map(parseDartLabel) : null;
+    }
+    return searchRoute(rem, rule, dartsLeft);
+  }
+  // A single dart could finish from this remaining score.
+  function oneDartFinish(rem, rule) {
+    return !!(FINISH_BY_VALUE[rule].get(rem) || []).length;
+  }
+
+  /* ---------- sectors (stats chart) ---------- */
+  // 0 miss, 1..20 singles, 25, D1..D20, D25, T1..T20
+  const X01_SECTOR_LABELS = (() => {
+    const a = ['0'];
+    for (let i = 1; i <= 20; i++) a.push(String(i));
+    a.push('25');
+    for (let i = 1; i <= 20; i++) a.push('D' + i);
+    a.push('D25');
+    for (let i = 1; i <= 20; i++) a.push('T' + i);
+    return a;
+  })();
+  const X01_TICKS = ['0', '5', '10', '15', '25', 'D5', 'D10', 'D15', 'D25', 'T5', 'T10', 'T15', 'T20'];
+  function sectorKey(d) {
+    if (!d || !d.s || !d.m) return '0';
+    if (d.m === 1) return String(d.s);
+    return (d.m === 2 ? 'D' : 'T') + d.s;
+  }
+  function cricketSectorLabels(nums) {
+    const singles = nums.filter((n) => n !== 25).sort((a, b) => a - b);
+    const a = ['0'];
+    singles.forEach((n) => a.push(String(n)));
+    a.push('25');
+    singles.forEach((n) => a.push('D' + n));
+    a.push('D25');
+    singles.forEach((n) => a.push('T' + n));
+    return a;
+  }
+
+  /* ---------- X01 leg replay ---------- */
+  const checkInOk = (d, rule) => rule === 'straight' || (d.s > 0 && (d.m === 2 || (rule === 'master' && d.m === 3)));
+  const checkOutOk = (d, rule) => finishOk(d, rule);
+
+  function replayX01Leg(S, P, starter, events) {
+    const n = P.length;
+    const hr = !!(S.houseRule && S.houseRule.oneBustLowScore);
+    const allowance = hr ? Math.max(1, Math.min(3, S.houseRule.bustAllowance || 1)) : 0;
+    const rule = S.checkOut;
+    const rem = P.map(() => S.points);
+    const checked = P.map(() => S.checkIn === 'straight');
+    const busts = P.map(() => 0);
+    const turns = [];
+    let seat = starter, cur = null, phase = 'normal';
+    let lockerSeat = null, lockedScore = null, finalOrder = [], finalPos = 0;
+    let winnerSeat = null, resultType = null, consumed = 0, idx = 0;
+
+    const startTurn = () => {
+      cur = {
+        pid: P[seat].id, seat, darts: [], start: rem[seat], startCheckedIn: checked[seat],
+        busted: false, checkout: false, endedEarly: false, isFinalTurn: phase === 'final',
+        lockedThisTurn: false, autoLocked: false, bustNumber: 0, totalEntry: false, score: 0,
+        checkedIn: checked[seat], evStart: idx, evEnd: idx,
+      };
+    };
+    const closeTurn = () => {
+      cur.end = rem[seat];
+      cur.score = cur.busted ? 0 : cur.start - cur.end;
+      cur.checkedIn = checked[seat];
+      cur.evEnd = idx + 1;
+      turns.push(cur);
+      cur = null;
+    };
+    const resolveLow = () => {
+      let best = null;
+      for (const s of [lockerSeat, ...finalOrder]) if (best === null || rem[s] < rem[best]) best = s;
+      winnerSeat = best;
+      resultType = 'lowScore';
+      phase = 'done';
+    };
+    const advance = () => {
+      if (winnerSeat !== null) return;
+      if (phase === 'normal') { seat = (seat + 1) % n; return; }
+      finalPos++;
+      if (finalPos >= finalOrder.length) resolveLow();
+      else seat = finalOrder[finalPos];
+    };
+    const startFinal = (s) => {
+      phase = 'final';
+      lockerSeat = s;
+      lockedScore = rem[s];
+      finalOrder = [];
+      for (let k = 1; k < n; k++) finalOrder.push((s + k) % n);
+      finalPos = -1;
+    };
+    const bust = () => {
+      rem[seat] = cur.start;
+      checked[seat] = cur.startCheckedIn;
+      cur.busted = true;
+      for (const x of cur.darts) x.scored = 0;
+      busts[seat]++;
+      cur.bustNumber = busts[seat];
+      const s = seat;
+      if (hr && phase === 'normal' && busts[seat] > allowance) {
+        cur.autoLocked = true;
+        closeTurn();
+        startFinal(s);
+      } else closeTurn();
+      advance();
+    };
+    const win = () => {
+      cur.checkout = true;
+      closeTurn();
+      winnerSeat = seat;
+      resultType = 'checkout';
+      phase = 'done';
+    };
+
+    for (idx = 0; idx < events.length; idx++) {
+      if (winnerSeat !== null) break;
+      const ev = events[idx];
+      consumed = idx + 1;
+      if (ev.t === 'd') {
+        if (!validDart(ev)) continue;
+        if (!cur) startTurn();
+        const d = { s: ev.s, m: ev.m, v: dartValue(ev.s, ev.m), total: false, scored: 0, rb: rem[seat], ci: checked[seat] };
+        cur.darts.push(d);
+        if (!checked[seat]) {
+          if (checkInOk(d, S.checkIn)) { checked[seat] = true; cur.checkInDart = cur.darts.length; }
+          else { if (cur.darts.length >= 3) { closeTurn(); advance(); } continue; }
+        }
+        const next = rem[seat] - d.v;
+        if (next < 0 || (next === 0 && !checkOutOk(d, rule)) || (next === 1 && rule !== 'straight')) { bust(); continue; }
+        d.scored = d.v;
+        rem[seat] = next;
+        if (next === 0) { win(); continue; }
+        if (cur.darts.length >= 3) { closeTurn(); advance(); }
+      } else if (ev.t === 'tot') {
+        if (cur && cur.darts.length) continue;
+        const v = ev.v, nd = Math.max(1, Math.min(3, ev.n || 3));
+        if (!isPossibleTotal(v)) continue;
+        startTurn();
+        cur.totalEntry = true;
+        for (let k = 0; k < nd; k++) cur.darts.push({ s: null, m: null, v: 0, total: true, scored: 0, rb: rem[seat], ci: checked[seat] });
+        if (!checked[seat]) {
+          if (v > 0) checked[seat] = true;
+          else { closeTurn(); advance(); continue; }
+        }
+        const next = rem[seat] - v;
+        const finishable = rule === 'straight' ? v <= 60 * nd : !!searchRoute(v, rule, nd);
+        if (next < 0 || (next === 1 && rule !== 'straight') || (next === 0 && !finishable)) { bust(); continue; }
+        cur.darts[0].scored = v;
+        rem[seat] = next;
+        if (next === 0) win();
+        else { closeTurn(); advance(); }
+      } else if (ev.t === 'end') {
+        if (cur && cur.darts.length) { cur.endedEarly = true; closeTurn(); advance(); }
+        else if (phase === 'final') { startTurn(); cur.endedEarly = true; closeTurn(); advance(); }
+      } else if (ev.t === 'lock') {
+        if (!hr || phase !== 'normal') continue;
+        if (!cur) startTurn();
+        const s = seat;
+        cur.lockedThisTurn = true;
+        cur.endedEarly = cur.darts.length < 3;
+        closeTurn();
+        startFinal(s);
+        advance();
+      }
+    }
+    idx = events.length;
+    const live = winnerSeat === null ? (cur || (startTurn(), cur)) : null;
+    const finalScores = {}, bustCounts = {};
+    P.forEach((p, i) => { finalScores[p.id] = rem[i]; bustCounts[p.id] = busts[i]; });
+    return {
+      turns, current: live, seat, rem, checked, busts, phase,
+      lockerSeat, lockerId: lockerSeat === null ? null : P[lockerSeat].id, lockedScore,
+      finalOrder, finalPos, finalRoundOrder: finalOrder.map((s) => P[s].id),
+      winnerSeat, winnerId: winnerSeat === null ? null : P[winnerSeat].id, resultType,
+      finalScores, bustCounts, consumed, houseRule: hr, allowance,
+    };
+  }
+
+  /* ---------- Cricket leg replay ---------- */
+  function replayCricketLeg(S, P, starter, events) {
+    const n = P.length, nums = S.numbers || CRICKET_DEFAULT, mode = S.scoring || 'standard';
+    const marks = P.map(() => { const o = {}; nums.forEach((x) => (o[x] = 0)); return o; });
+    const points = P.map(() => 0);
+    const turns = [];
+    let seat = starter, cur = null, winnerSeat = null, consumed = 0, idx = 0;
+    const startTurn = () => { cur = { pid: P[seat].id, seat, darts: [], marks: 0, points: 0, endedEarly: false, evStart: idx, evEnd: idx }; };
+    const closeTurn = () => { cur.evEnd = idx + 1; turns.push(cur); cur = null; };
+    const closedAll = (s) => nums.every((x) => marks[s][x] >= 3);
+    const wins = (s) => {
+      if (!closedAll(s)) return false;
+      if (mode === 'noscore') return true;
+      for (let o = 0; o < n; o++) {
+        if (o === s) continue;
+        if (mode === 'standard' && points[s] < points[o]) return false;
+        if (mode === 'cutthroat' && points[s] > points[o]) return false;
+      }
+      return true;
+    };
+    for (idx = 0; idx < events.length; idx++) {
+      if (winnerSeat !== null) break;
+      const ev = events[idx];
+      consumed = idx + 1;
+      if (ev.t === 'd') {
+        if (!validDart(ev)) continue;
+        if (!cur) startTurn();
+        const inPlay = ev.s > 0 && nums.includes(ev.s);
+        const d = inPlay ? { s: ev.s, m: ev.m, v: dartValue(ev.s, ev.m), marks: 0, hits: ev.m, pts: 0 } : { s: 0, m: 0, v: 0, marks: 0, hits: 0, pts: 0 };
+        if (inPlay) {
+          const x = ev.s, val = x === 25 ? 25 : x, cm = marks[seat][x];
+          const add = Math.min(ev.m, 3 - cm), extra = ev.m - add;
+          marks[seat][x] = cm + add;
+          d.marks = add;
+          const openOpps = [];
+          for (let o = 0; o < n; o++) if (o !== seat && marks[o][x] < 3) openOpps.push(o);
+          if (extra > 0 && openOpps.length && mode !== 'noscore') {
+            d.marks += extra;
+            d.pts = extra * val;
+            if (mode === 'standard') points[seat] += d.pts;
+            else openOpps.forEach((o) => (points[o] += d.pts));
+          }
+        }
+        cur.darts.push(d);
+        cur.marks += d.marks;
+        cur.points += d.pts;
+        const order = [seat];
+        for (let k = 1; k < n; k++) order.push((seat + k) % n);
+        const w = order.find(wins);
+        if (w !== undefined) { cur.win = true; closeTurn(); winnerSeat = w; break; }
+        if (cur.darts.length >= 3) { closeTurn(); seat = (seat + 1) % n; }
+      } else if (ev.t === 'end') {
+        if (cur && cur.darts.length) { cur.endedEarly = true; closeTurn(); seat = (seat + 1) % n; }
+      }
+    }
+    idx = events.length;
+    const live = winnerSeat === null ? (cur || (startTurn(), cur)) : null;
+    const dead = {};
+    nums.forEach((x) => (dead[x] = marks.every((mk) => mk[x] >= 3)));
+    const finalScores = {};
+    P.forEach((p, i) => (finalScores[p.id] = points[i]));
+    return {
+      turns, current: live, seat, marks, points, dead, nums, mode,
+      winnerSeat, winnerId: winnerSeat === null ? null : P[winnerSeat].id,
+      resultType: winnerSeat === null ? null : 'closed', finalScores, consumed, phase: winnerSeat === null ? 'normal' : 'done',
+    };
+  }
+
+  /* ---------- match replay ---------- */
+  const DERIVED_LEG_KEYS = ['turns', 'winnerId', 'resultType', 'lockerId', 'lockedScore', 'finalRoundOrder', 'finalScores', 'bustCounts', 'setNo', 'legNo', 'starterId', 'wonSet', 'wonMatch'];
+
+  function replayMatch(match) {
+    const S = match.settings, P = match.players, n = P.length;
+    const setsNeed = neededWins(S.format, S.sets), legsNeed = neededWins(S.format, S.legs);
+    const setsWon = {}, legsWonSet = {}, legsWonTotal = {};
+    P.forEach((p) => { setsWon[p.id] = 0; legsWonSet[p.id] = 0; legsWonTotal[p.id] = 0; });
+    if (!match.legs || !match.legs.length) match.legs = [{ events: [] }];
+    const legs = match.legs;
+    let setNo = 0, legInSet = 0, setStarter = 0, winnerId = null, live = null, liveIndex = legs.length - 1;
+    for (let li = 0; li < legs.length; li++) {
+      const leg = legs[li];
+      if (!Array.isArray(leg.events)) leg.events = [];
+      const starter = (setStarter + legInSet) % n;
+      const r = match.mode === 'cricket' ? replayCricketLeg(S, P, starter, leg.events) : replayX01Leg(S, P, starter, leg.events);
+      DERIVED_LEG_KEYS.forEach((k) => delete leg[k]);
+      Object.assign(leg, {
+        setNo: setNo + 1, legNo: legInSet + 1, starterId: P[starter].id, turns: r.turns,
+        winnerId: r.winnerId, resultType: r.resultType, finalScores: r.finalScores,
+      });
+      if (match.mode !== 'cricket') {
+        Object.assign(leg, { lockerId: r.lockerId, lockedScore: r.lockedScore, finalRoundOrder: r.finalRoundOrder, bustCounts: r.bustCounts });
+      }
+      if (r.consumed < leg.events.length && r.winnerId !== null) leg.events = leg.events.slice(0, r.consumed);
+      if (r.winnerId === null) {
+        live = r; liveIndex = li;
+        if (li < legs.length - 1) legs.length = li + 1;
+        break;
+      }
+      const w = r.winnerId;
+      legsWonSet[w]++;
+      legsWonTotal[w]++;
+      if (legsWonSet[w] >= legsNeed) {
+        setsWon[w]++;
+        leg.wonSet = true;
+        if (setsWon[w] >= setsNeed) {
+          winnerId = w;
+          leg.wonMatch = true;
+          if (li < legs.length - 1) legs.length = li + 1;
+          liveIndex = li;
+          break;
+        }
+        Object.keys(legsWonSet).forEach((k) => (legsWonSet[k] = 0));
+        setNo++;
+        legInSet = 0;
+        setStarter = (setStarter + 1) % n;
+      } else legInSet++;
+      if (li === legs.length - 1) legs.push({ events: [] });
+    }
+    match.winnerId = winnerId;
+    return { winnerId, setsWon, legsWonSet, legsWonTotal, live, liveIndex, setNo: setNo + 1, legNo: legInSet + 1, setsNeed, legsNeed };
+  }
+
+  function undoLast(match) {
+    const legs = match.legs;
+    for (let i = legs.length - 1; i >= 0; i--) {
+      if (legs[i].events.length) { legs[i].events.pop(); legs.length = i + 1; return true; }
+    }
+    return false;
+  }
+
+  // Turn state helpers used by the UI and the tests.
+  function canLockIn(match, rs) {
+    if (!match || match.mode !== 'x01' || !rs || !rs.live) return false;
+    const S = match.settings;
+    if (!(S.houseRule && S.houseRule.oneBustLowScore)) return false;
+    return rs.live.phase === 'normal';
+  }
+  function isFinalTurn(match, rs) {
+    return !!(match && match.mode === 'x01' && rs && rs.live && rs.live.phase === 'final');
+  }
+  // Remaining must drop strictly below this to beat the current leader in the final round.
+  function finalTarget(live) {
+    let t = live.lockedScore;
+    for (let k = 0; k < live.finalPos; k++) t = Math.min(t, live.rem[live.finalOrder[k]]);
+    return t;
+  }
+
+  /* ---------- dartboard model for bots ---------- */
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(rng) {
+    let u = 0, v = 0;
+    while (u === 0) u = rng();
+    while (v === 0) v = rng();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+  function aimPoint(d) {
+    if (d.s === 25) return d.m === 2 ? { x: 0, y: 0 } : { x: 0, y: 11 };
+    const i = BOARD_ORDER.indexOf(d.s);
+    const th = (i * 18 * Math.PI) / 180;
+    const r = d.m === 3 ? 103 : d.m === 2 ? 166 : 135;
+    return { x: r * Math.sin(th), y: r * Math.cos(th) };
+  }
+  function landingDart(x, y) {
+    const r = Math.hypot(x, y);
+    if (r <= RINGS.innerBull) return { s: 25, m: 2 };
+    if (r <= RINGS.outerBull) return { s: 25, m: 1 };
+    if (r > RINGS.doubleOut) return { s: 0, m: 0 };
+    let deg = (Math.atan2(x, y) * 180) / Math.PI;
+    deg = (deg + 360 + 9) % 360;
+    const s = BOARD_ORDER[Math.floor(deg / 18) % 20];
+    const m = r >= RINGS.tripleIn && r <= RINGS.tripleOut ? 3 : r >= RINGS.doubleIn ? 2 : 1;
+    return { s, m };
+  }
+  function throwAt(target, skill, rng) {
+    const sig = SKILL_SIGMA[Math.max(1, Math.min(5, skill || 3))];
+    const p = aimPoint(target);
+    return landingDart(p.x + gauss(rng) * sig, p.y + gauss(rng) * sig);
+  }
+
+  const SCORING_AIMS = (() => {
+    const a = [];
+    for (let s = 20; s >= 1; s--) a.push({ s, m: 3 });
+    for (let s = 20; s >= 1; s--) a.push({ s, m: 1 });
+    a.push({ s: 25, m: 1 });
+    return a.sort((x, y) => dartValue(y.s, y.m) - dartValue(x.s, x.m));
+  })();
+  const SETUP_AIMS = [{ s: 20, m: 3 }, { s: 19, m: 3 }, { s: 18, m: 3 }, { s: 17, m: 3 }, { s: 16, m: 3 }, { s: 15, m: 3 },
+    { s: 20, m: 1 }, { s: 19, m: 1 }, { s: 18, m: 1 }, { s: 17, m: 1 }, { s: 16, m: 1 }, { s: 15, m: 1 }, { s: 25, m: 1 }];
+
+  function chooseX01Aim(rem, dartsLeft, S, checkedIn, maxScore) {
+    if (!checkedIn) return S.checkIn === 'double' ? { s: 20, m: 2 } : { s: 20, m: 3 };
+    const rule = S.checkOut, minLeave = rule === 'straight' ? 1 : 2;
+    const route = checkoutRoute(rem, rule, dartsLeft);
+    if (route) return route[0];
+    if (maxScore) {
+      for (const a of SCORING_AIMS) if (rem - dartValue(a.s, a.m) >= minLeave) return a;
+      return { s: 1, m: 1 };
+    }
+    if (rem - 60 > 170) return { s: 20, m: 3 };
+    const nextDarts = dartsLeft > 1 ? dartsLeft - 1 : 3;
+    for (const a of SETUP_AIMS) {
+      const left = rem - dartValue(a.s, a.m);
+      if (left >= minLeave && checkoutRoute(left, rule, nextDarts)) return a;
+    }
+    for (const a of SCORING_AIMS) {
+      const left = rem - dartValue(a.s, a.m);
+      if (left >= minLeave && (rule === 'straight' || left !== 1)) return a;
+    }
+    return { s: 1, m: 1 };
+  }
+
+  function botShouldLock(S, live, seat, skill) {
+    const rem = live.rem[seat];
+    const freeLeft = live.allowance - live.busts[seat] > 0;
+    const opps = live.rem.filter((_, i) => i !== seat);
+    if (!opps.length) return rem <= 40;
+    const minOpp = Math.min(...opps);
+    if (minOpp - 140 > rem) return true;
+    let thr = [0, 60, 45, 32, 20, 10][Math.max(1, Math.min(5, skill || 3))];
+    if (freeLeft) thr = Math.round(thr / 2);
+    const dartsLeft = 3 - live.current.darts.length;
+    const route = checkoutRoute(rem, S.checkOut, dartsLeft);
+    return rem <= thr && (!route || skill <= 2);
+  }
+
+  function chooseCricketAim(S, live, seat) {
+    const nums = live.nums, mk = live.marks, pts = live.points, n = mk.length, mode = live.mode;
+    const others = []; for (let o = 0; o < n; o++) if (o !== seat) others.push(o);
+    const byValue = nums.slice().sort((a, b) => (a === 25 ? 0 : a) > (b === 25 ? 0 : b) ? -1 : 1);
+    const aim = (x) => (x === 25 ? { s: 25, m: 2 } : { s: x, m: 3 });
+    const mineOpen = byValue.filter((x) => mk[seat][x] < 3);
+    const scoring = byValue.filter((x) => mk[seat][x] >= 3 && others.some((o) => mk[o][x] < 3));
+    if (mode === 'standard') {
+      const maxOpp = Math.max(...others.map((o) => pts[o]));
+      if ((pts[seat] <= maxOpp || !mineOpen.length) && scoring.length && (pts[seat] < maxOpp || !mineOpen.length)) return aim(scoring[0]);
+      if (mineOpen.length) return aim(mineOpen[0]);
+      return scoring.length ? aim(scoring[0]) : { s: 20, m: 3 };
+    }
+    if (mode === 'cutthroat') {
+      const minOpp = Math.min(...others.map((o) => pts[o]));
+      if ((!mineOpen.length || pts[seat] > minOpp) && scoring.length && !mineOpen.length) return aim(scoring[0]);
+      if (mineOpen.length) return aim(mineOpen[0]);
+      return scoring.length ? aim(scoring[0]) : { s: 20, m: 3 };
+    }
+    return mineOpen.length ? aim(mineOpen[0]) : { s: 20, m: 3 };
+  }
+
+  // Returns the next event a computer player makes. Always a legal event.
+  function botAction(match, rs, rng) {
+    rng = rng || Math.random;
+    const live = rs.live, seat = live.seat, p = match.players[seat], skill = p.skill || 3;
+    if (match.mode === 'cricket') {
+      const t = throwAt(chooseCricketAim(match.settings, live, seat), skill, rng);
+      if (t.s && !live.nums.includes(t.s)) return { t: 'd', s: 0, m: 0 };
+      return { t: 'd', s: t.s, m: t.m };
+    }
+    const S = match.settings, cur = live.current, dartsLeft = 3 - cur.darts.length, rem = live.rem[seat];
+    let maxScore = false;
+    if (live.phase === 'final') {
+      const target = finalTarget(live);
+      if (rem < target && !checkoutRoute(rem, S.checkOut, dartsLeft)) return { t: 'end' };
+      if (rem < target && cur.darts.length > 0) return { t: 'end' };
+      maxScore = true;
+    } else if (live.houseRule && live.phase === 'normal' && botShouldLock(S, live, seat, skill)) {
+      return { t: 'lock' };
+    }
+    const t = throwAt(chooseX01Aim(rem, dartsLeft, S, live.checked[seat], maxScore), skill, rng);
+    return { t: 'd', s: t.s, m: t.m };
+  }
+
+  /* ---------- statistics (pure) ---------- */
+  const safeDiv = (a, b) => (b ? a / b : 0);
+  const pct = (a, b) => safeDiv(a, b) * 100;
+  function inRange(match, range, now) {
+    const t = match.endedAt || 0;
+    if (!range || range === 'all') return true;
+    if (range === 'today') { const d = new Date(now); d.setHours(0, 0, 0, 0); return t >= d.getTime(); }
+    const days = range === '7d' ? 7 : 30;
+    return t >= now - days * 86400000;
+  }
+  function filterMatches(matches, filter) {
+    const now = filter.now || Date.now();
+    return matches.filter((m) =>
+      (filter.includeUnfinished || m.status === 'finished') && m.mode === filter.mode && inRange(m, filter.range, now));
+  }
+  function playerOrder(ms, filter) {
+    const seen = new Map();
+    ms.forEach((m) => m.players.forEach((p) => { if (!seen.has(p.id)) seen.set(p.id, p); }));
+    const order = (filter.order || []).filter((id) => seen.has(id));
+    seen.forEach((_, id) => { if (!order.includes(id)) order.push(id); });
+    const hidden = new Set(filter.hidden || []);
+    return order.filter((id) => !hidden.has(id)).map((id) => seen.get(id));
+  }
+
+  function statsX01(matches, filter) {
+    const ms = filterMatches(matches, Object.assign({}, filter, { mode: 'x01' }));
+    const players = playerOrder(ms, filter);
+    const acc = {};
+    players.forEach((p) => {
+      acc[p.id] = {
+        id: p.id, name: p.name, isBot: !!p.isBot, games: 0, wins: 0, legs: 0, legsWon: 0,
+        darts: 0, legDarts: 0, points: 0, f9Points: 0, f9Darts: 0, maxScore: 0,
+        b60: 0, b100: 0, b140: 0, b180: 0, tracked: 0, doubles: 0, triples: 0,
+        maxCheckout: 0, minDarts: 0, checkouts: 0, attempts: 0,
+        hrGames: 0, locks: 0, busts: 0, autoLocks: 0, finalWins: 0, finalAttempts: 0,
+        sectors: X01_SECTOR_LABELS.map(() => 0),
+      };
+    });
+    let hasHouse = false;
+    for (const m of ms) {
+      const hr = !!(m.settings.houseRule && m.settings.houseRule.oneBustLowScore);
+      if (hr) hasHouse = true;
+      const rule = m.settings.checkOut;
+      m.players.forEach((p) => {
+        const a = acc[p.id]; if (!a) return;
+        a.games++; if (m.winnerId === p.id) a.wins++; if (hr) a.hrGames++;
+      });
+      for (const leg of m.legs) {
+        if (!leg.winnerId || !leg.turns) continue;
+        const legDarts = {}, turnNo = {};
+        m.players.forEach((p) => { const a = acc[p.id]; if (a) { a.legs++; if (leg.winnerId === p.id) a.legsWon++; } legDarts[p.id] = 0; turnNo[p.id] = 0; });
+        for (const t of leg.turns) {
+          const nd = t.darts.length;
+          legDarts[t.pid] += nd;
+          const a = acc[t.pid]; if (!a) continue;
+          a.darts += nd; a.legDarts += nd; a.points += t.score;
+          if (turnNo[t.pid] < 3) { a.f9Points += t.score; a.f9Darts += nd; }
+          turnNo[t.pid]++;
+          if (t.score > a.maxScore) a.maxScore = t.score;
+          if (t.score === 180) a.b180++; else if (t.score >= 140) a.b140++; else if (t.score >= 100) a.b100++; else if (t.score >= 60) a.b60++;
+          if (!t.totalEntry) {
+            for (const d of t.darts) {
+              a.tracked++;
+              if (isDoubleDart(d)) a.doubles++;
+              if (isTripleDart(d)) a.triples++;
+              a.sectors[X01_SECTOR_LABELS.indexOf(sectorKey(d))]++;
+              if (d.ci !== false && oneDartFinish(d.rb, rule)) a.attempts++;
+            }
+          }
+          if (t.checkout) {
+            if (!t.totalEntry) a.checkouts++;
+            if (t.start > a.maxCheckout) a.maxCheckout = t.start;
+          }
+          if (hr) {
+            if (t.lockedThisTurn) a.locks++;
+            if (t.busted) a.busts++;
+            if (t.autoLocked) a.autoLocks++;
+            if (t.isFinalTurn) { a.finalAttempts++; if (leg.winnerId === t.pid) a.finalWins++; }
+          }
+        }
+        if (leg.resultType === 'checkout' && acc[leg.winnerId]) {
+          const a = acc[leg.winnerId], nd = legDarts[leg.winnerId];
+          if (!a.minDarts || nd < a.minDarts) a.minDarts = nd;
+        }
+      }
+    }
+    const rows = players.map((p) => {
+      const a = acc[p.id];
+      return Object.assign(a, {
+        winPct: pct(a.wins, a.games), legPct: pct(a.legsWon, a.legs),
+        dartsPerLeg: safeDiv(a.legDarts, a.legs), doublePct: pct(a.doubles, a.tracked), triplePct: pct(a.triples, a.tracked),
+        avg: safeDiv(a.points, a.darts) * 3, first9: safeDiv(a.f9Points, a.f9Darts) * 3,
+        checkoutPct: pct(a.checkouts, a.attempts),
+      });
+    });
+    return { rows, hasData: ms.length > 0, hasHouse, labels: X01_SECTOR_LABELS, ticks: X01_TICKS, matchCount: ms.length };
+  }
+
+  function statsCricket(matches, filter) {
+    const ms = filterMatches(matches, Object.assign({}, filter, { mode: 'cricket' }));
+    const players = playerOrder(ms, filter);
+    const numSet = new Set();
+    ms.forEach((m) => (m.settings.numbers || CRICKET_DEFAULT).forEach((x) => numSet.add(x)));
+    if (!numSet.size) CRICKET_DEFAULT.forEach((x) => numSet.add(x));
+    const labels = cricketSectorLabels([...numSet]);
+    const acc = {};
+    players.forEach((p) => {
+      acc[p.id] = { id: p.id, name: p.name, isBot: !!p.isBot, games: 0, wins: 0, legs: 0, legsWon: 0, darts: 0, rounds: 0,
+        marks: 0, triples: 0, bulls: 0, points: 0, maxMarks: 0, sectors: labels.map(() => 0) };
+    });
+    for (const m of ms) {
+      m.players.forEach((p) => { const a = acc[p.id]; if (a) { a.games++; if (m.winnerId === p.id) a.wins++; } });
+      for (const leg of m.legs) {
+        if (!leg.winnerId || !leg.turns) continue;
+        m.players.forEach((p) => { const a = acc[p.id]; if (a) { a.legs++; if (leg.winnerId === p.id) a.legsWon++; } });
+        for (const t of leg.turns) {
+          const a = acc[t.pid]; if (!a) continue;
+          a.rounds++; a.darts += t.darts.length; a.marks += t.marks; a.points += t.points;
+          if (t.marks > a.maxMarks) a.maxMarks = t.marks;
+          for (const d of t.darts) {
+            if (d.m === 3 && d.s) a.triples++;
+            if (d.s === 25) a.bulls++;
+            const i = labels.indexOf(sectorKey(d));
+            a.sectors[i < 0 ? 0 : i]++;
+          }
+        }
+      }
+    }
+    const rows = players.map((p) => {
+      const a = acc[p.id];
+      return Object.assign(a, { winPct: pct(a.wins, a.games), legPct: pct(a.legsWon, a.legs), mpr: safeDiv(a.marks, a.darts) * 3, ppr: safeDiv(a.points, a.rounds) });
+    });
+    const ticks = labels.filter((l, i) => i === 0 || l === '25' || l === 'D25' || /^[DT]?(15|20)$/.test(l));
+    return { rows, hasData: ms.length > 0, labels, ticks, matchCount: ms.length };
+  }
+
+  // Live per-match numbers for the in-game cards (all turns of the match so far).
+  function matchPlayerTotals(match, rs) {
+    const out = {};
+    match.players.forEach((p) => (out[p.id] = { darts: 0, points: 0, marks: 0 }));
+    match.legs.forEach((leg) => (leg.turns || []).forEach((t) => {
+      const o = out[t.pid]; if (!o) return;
+      o.darts += t.darts.length;
+      o.points += match.mode === 'cricket' ? t.points : t.score;
+      o.marks += t.marks || 0;
+    }));
+    if (rs && rs.live && rs.live.current) {
+      const c = rs.live.current, o = out[c.pid];
+      o.darts += c.darts.length;
+      if (match.mode === 'cricket') o.marks += c.marks;
+      else o.points += c.start - rs.live.rem[c.seat];
+    }
+    return out;
+  }
+
+  /* ---------- compact serialisation of raw events ---------- */
+  function encodeEvent(e) {
+    if (e.t === 'd') return e.s ? 'MSDT'[e.m] + e.s : 'M';
+    if (e.t === 'tot') return 'X' + e.v + '/' + (e.n || 3);
+    if (e.t === 'end') return 'E';
+    if (e.t === 'lock') return 'L';
+    return '';
+  }
+  function decodeEvent(str) {
+    if (typeof str !== 'string') return str && str.t ? str : null;
+    if (str === 'M') return { t: 'd', s: 0, m: 0 };
+    if (str === 'E') return { t: 'end' };
+    if (str === 'L') return { t: 'lock' };
+    if (str[0] === 'X') { const [v, n] = str.slice(1).split('/'); return { t: 'tot', v: +v, n: +n || 3 }; }
+    const m = 'MSDT'.indexOf(str[0]);
+    return { t: 'd', s: +str.slice(1), m };
+  }
+
+  /* ---------- self-tests ---------- */
+  function runSelfTests() {
+    const results = [];
+    const test = (name, fn) => {
+      try { const r = fn(); results.push({ name, pass: r === true, detail: r === true ? '' : String(r) }); }
+      catch (e) { results.push({ name, pass: false, detail: e.message }); }
+    };
+    const P2 = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }];
+    const P3 = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'c', name: 'C' }];
+    const X = (o) => Object.assign({ points: 301, checkIn: 'straight', checkOut: 'double', format: 'firstTo', sets: 1, legs: 1, houseRule: { oneBustLowScore: false, bustAllowance: 1 } }, o || {});
+    const HR = (o) => X(Object.assign({ houseRule: { oneBustLowScore: true, bustAllowance: 1 } }, o || {}));
+    const D = (lbl) => Object.assign({ t: 'd' }, parseDartLabel(lbl));
+    const ev = (str) => str.split(' ').filter(Boolean).map((x) => (x === 'E' ? { t: 'end' } : x === 'L' ? { t: 'lock' } : D(x)));
+    const leg = (S, P, str, starter) => replayX01Leg(S, P, starter || 0, ev(str));
+    const mkMatch = (S, P, mode) => ({ mode: mode || 'x01', settings: S, players: P, legs: [{ events: [] }] });
+
+    test('Bust reverts the score and scores zero', () => {
+      const r = leg(X({ points: 50 }), P2, 'T20');
+      const t = r.turns[0];
+      return (t.busted && t.score === 0 && r.rem[0] === 50 && r.seat === 1) || JSON.stringify(t);
+    });
+    test('Double Out: leaving 1 is a bust', () => {
+      const r = leg(X({ points: 41 }), P2, 'T20 S20');
+      return (r.turns[0].busted && r.rem[0] === 41) || 'rem ' + r.rem[0];
+    });
+    test('Double Out: finishing on a single is a bust', () => {
+      const r = leg(X({ points: 40 }), P2, 'T10 S10');
+      return (r.turns[0].busted && r.winnerId === null) || 'no bust';
+    });
+    test('Double In: nothing scores before a double', () => {
+      const r = leg(X({ checkIn: 'double' }), P2, 'T20 T20 D10');
+      const t = r.turns[0];
+      return (t.score === 20 && r.rem[0] === 281 && r.checked[0]) || 'score ' + t.score;
+    });
+    test('Master Out: triple finishes, single busts', () => {
+      const a = leg(X({ points: 60, checkOut: 'master' }), P2, 'T20');
+      const b = leg(X({ points: 20, checkOut: 'master' }), P2, 'S20');
+      const c = leg(X({ points: 3, checkOut: 'master' }), P2, 'S2');
+      return (a.winnerId === 'a' && b.turns[0].busted && c.turns[0].busted) || 'master out wrong';
+    });
+    test('Straight Out: exact zero wins on any dart', () => {
+      const r = leg(X({ points: 20, checkOut: 'straight' }), P2, 'S20');
+      return (r.winnerId === 'a' && r.resultType === 'checkout') || 'no win';
+    });
+    test('Best of 5 needs 3, first to 5 needs 5', () => neededWins('bestOf', 5) === 3 && neededWins('firstTo', 5) === 5 && neededWins('bestOf', 1) === 1);
+    test('Starter rotation across legs and sets', () => {
+      // First to 2 sets of first to 2 legs; A wins every leg.
+      const m = mkMatch(X({ points: 101, checkOut: 'straight', sets: 2, legs: 2 }), P2);
+      const legFor = (starter) => (starter === 'a' ? ev('T20 S20 S20 S1 S1 S1 S1') : ev('S1 S1 S1 T20 S20 S20 S1 S1 S1 S1'));
+      const starters = [];
+      for (let i = 0; i < 4; i++) {
+        const rs = replayMatch(m);
+        const st = m.players[rs.live.seat].id;
+        starters.push(st);
+        m.legs[m.legs.length - 1].events = legFor(st);
+      }
+      const rs = replayMatch(m);
+      // Set 1: A then B start. Set 2 opens with B (who did not start set 1), then A.
+      return (starters.join('') === 'abba' && rs.winnerId === 'a' && rs.setsWon.a === 2) || starters.join('');
+    });
+    test('Total entry is excluded from sector stats but counts in average', () => {
+      const m = mkMatch(X({ points: 101, checkOut: 'straight' }), [{ id: 'a', name: 'A' }]);
+      m.legs[0].events = [{ t: 'tot', v: 60, n: 3 }, D('S20'), D('S20'), D('S1')];
+      replayMatch(m); m.status = 'finished'; m.endedAt = Date.now();
+      const s = statsX01([m], { range: 'all' }).rows[0];
+      const sectorSum = s.sectors.reduce((a, b) => a + b, 0);
+      return (sectorSum === 3 && s.darts === 6 && s.points === 101 && s.maxScore === 60) || JSON.stringify({ sectorSum, d: s.darts, p: s.points });
+    });
+    test('Stats never divide by zero', () => {
+      const s = statsX01([], { range: 'all' });
+      const c = statsCricket([], { range: 'all' });
+      const z = safeDiv(5, 0) === 0 && pct(0, 0) === 0;
+      return (z && !s.hasData && !c.hasData && s.rows.length === 0) || 'unsafe';
+    });
+    test('Checkout table: 170, 100, 40 and impossible finishes', () => {
+      const ok = CHECKOUT_TABLE[170] === 'T20 T20 Bull' && CHECKOUT_TABLE[100] === 'T20 D20' && CHECKOUT_TABLE[40] === 'D20';
+      const none = IMPOSSIBLE_CHECKOUTS.every((v) => !CHECKOUT_TABLE[v] && !checkoutRoute(v, 'double', 3));
+      let valid = true;
+      for (let v = 2; v <= 170; v++) {
+        const r = CHECKOUT_TABLE[v];
+        if (IMPOSSIBLE_CHECKOUTS.includes(v)) continue;
+        if (!r) { valid = 'missing ' + v; break; }
+        const ds = r.split(' ').map(parseDartLabel);
+        if (ds.reduce((a, d) => a + dartValue(d.s, d.m), 0) !== v || ds[ds.length - 1].m !== 2) { valid = 'bad ' + v; break; }
+      }
+      return (ok && none && valid === true) || (valid === true ? 'table entries wrong' : valid);
+    });
+    test('Impossible three-dart totals are rejected', () => [179, 178, 176, 175, 173, 172, 169, 166, 163].every((v) => !isPossibleTotal(v)) && isPossibleTotal(180) && isPossibleTotal(177) && !isPossibleTotal(181));
+    test('Sector chart order: 0, 1-20, 25, D1-D20, D25, T1-T20', () => {
+      const L = X01_SECTOR_LABELS;
+      return (L.length === 63 && L[0] === '0' && L[1] === '1' && L[20] === '20' && L[21] === '25' && L[22] === 'D1' && L[41] === 'D20' && L[42] === 'D25' && L[43] === 'T1' && L[62] === 'T20') || L.join(',');
+    });
+    test('Board geometry maps to real sectors', () => {
+      const t20 = landingDart(0, 103), d6 = landingDart(166, 0), bull = landingDart(0, 0), s3 = landingDart(0, -135), miss = landingDart(0, 180);
+      return (t20.s === 20 && t20.m === 3 && d6.s === 6 && d6.m === 2 && bull.s === 25 && bull.m === 2 && s3.s === 3 && s3.m === 1 && miss.s === 0) || 'geometry';
+    });
+    test('Bots never return an illegal dart', () => {
+      const rng = mulberry32(7);
+      for (let skill = 1; skill <= 5; skill++) {
+        for (let i = 0; i < 400; i++) {
+          const d = throwAt(SCORING_AIMS[i % SCORING_AIMS.length], skill, rng);
+          if (!validDart(d)) return 'illegal ' + JSON.stringify(d);
+        }
+      }
+      for (const mode of ['x01', 'cricket']) {
+        const S = mode === 'x01' ? HR({ points: 301 }) : { scoring: 'standard', numbers: CRICKET_DEFAULT, format: 'firstTo', sets: 1, legs: 1 };
+        const m = mkMatch(S, [{ id: 'a', name: 'A', isBot: true, skill: 2 }, { id: 'b', name: 'B', isBot: true, skill: 5 }], mode);
+        for (let i = 0; i < 3000; i++) {
+          const rs = replayMatch(m);
+          if (rs.winnerId) break;
+          const e = botAction(m, rs, rng);
+          if (e.t === 'd' && !validDart(e)) return 'illegal bot event';
+          if (e.t === 'lock' && !canLockIn(m, rs)) return 'illegal lock';
+          m.legs[m.legs.length - 1].events.push(e);
+        }
+        if (!replayMatch(m).winnerId) return mode + ' bot match did not finish';
+      }
+      return true;
+    });
+    const CS = (scoring) => ({ scoring, numbers: CRICKET_DEFAULT, format: 'firstTo', sets: 1, legs: 1 });
+    test('Cricket: extra marks score while an opponent is open', () => {
+      const r = replayCricketLeg(CS('standard'), P2, 0, ev('T20 T20'));
+      return (r.marks[0][20] === 3 && r.points[0] === 60) || 'points ' + r.points[0];
+    });
+    test('Cricket: closed by everyone means dead, no points', () => {
+      const r = replayCricketLeg(CS('standard'), P2, 0, ev('T20 M M T20 M M T20'));
+      return (r.dead[20] && r.points[0] === 0 && r.points[1] === 0) || JSON.stringify(r.points);
+    });
+    test('Cricket Cut-Throat: points go to open opponents', () => {
+      const r = replayCricketLeg(CS('cutthroat'), P3, 0, ev('T20 T20 M M M M T20 M M S20'));
+      // A closes 20 and hits 3 more (60 to B and C). C closes 20, then A hits S20: only B is open.
+      return (r.points[0] === 0 && r.points[1] === 80 && r.points[2] === 60) || JSON.stringify(r.points);
+    });
+    test('Cricket: closing everything while behind does not win', () => {
+      const S = CS('standard');
+      const e = 'M M M T20 T20 T20 T19 T18 T17 M M M T16 T15 Bull M M M 25 T20 M';
+      const r = replayCricketLeg(S, P2, 0, ev(e));
+      // B leads 120 to 0. A closes everything but trails, so play continues.
+      if (r.winnerId || r.points[1] !== 120) return 'won while behind ' + JSON.stringify(r.points);
+      const r2 = replayCricketLeg(S, P2, 0, ev(e + ' M M M T19 T19 T19'));
+      return (r2.winnerId === 'a' && r2.points[0] === 171) || 'did not win after catching up ' + JSON.stringify(r2.points);
+    });
+    // House rule
+    test('House rule: first bust is free and play continues', () => {
+      const r = leg(HR({ points: 50 }), P2, 'T20');
+      return (r.turns[0].busted && r.phase === 'normal' && r.busts[0] === 1 && r.seat === 1 && r.lockerId === null) || r.phase;
+    });
+    test('House rule: second bust reverts and auto-locks', () => {
+      const r = leg(HR({ points: 50 }), P2, 'T20 S1 S1 S1 S5 T20');
+      const t = r.turns[2];
+      return (t.busted && t.autoLocked && r.rem[0] === 50 && r.lockerId === 'a' && r.lockedScore === 50 && r.phase === 'final' && r.seat === 1) || JSON.stringify({ p: r.phase, l: r.lockedScore, rem: r.rem });
+    });
+    test('House rule: Lock In gives every other player exactly one turn', () => {
+      const r = leg(HR({ points: 301 }), P3, 'T20 L S1 S1 S1 S1 S1 S1');
+      return (r.lockerId === 'a' && r.lockedScore === 241 && r.winnerId === 'a' && r.resultType === 'lowScore' && r.turns.filter((t) => t.isFinalTurn).length === 2) || JSON.stringify({ w: r.winnerId, rt: r.resultType, n: r.turns.length });
+    });
+    test('House rule: a lock on the last seat wraps to the first seat', () => {
+      const r = leg(HR({ points: 301 }), P3, 'S1 S1 S1 S1 S1 S1 L');
+      return (r.finalRoundOrder.join('') === 'ab' && r.seat === 0 && r.phase === 'final') || r.finalRoundOrder.join('');
+    });
+    test('House rule: locker wins ties', () => {
+      const r = leg(HR({ points: 301 }), P2, 'T20 L T20 E');
+      return (r.winnerId === 'a' && r.finalScores.b === 241) || r.winnerId;
+    });
+    test('House rule: strictly lower score wins', () => {
+      const r = leg(HR({ points: 301 }), P2, 'T20 L T20 S1 E');
+      return (r.winnerId === 'b' && r.resultType === 'lowScore') || r.winnerId;
+    });
+    test('House rule: tie between non-lockers goes to the earlier thrower', () => {
+      const r = leg(HR({ points: 301 }), P3, 'S20 L T20 T20 E T20 T20 E');
+      return (r.winnerId === 'b') || r.winnerId;
+    });
+    test('House rule: exact-zero checkout in the final round wins at once', () => {
+      const r = leg(HR({ points: 40 }), P3, 'S10 L D20 S1');
+      return (r.winnerId === 'b' && r.resultType === 'checkout' && r.turns.length === 2) || JSON.stringify({ w: r.winnerId, rt: r.resultType });
+    });
+    test('House rule: a final-turn bust keeps the reverted score', () => {
+      const r = leg(HR({ points: 40 }), P2, 'S10 L S20 S20');
+      return (r.finalScores.b === 40 && r.winnerId === 'a' && r.turns[1].busted && r.turns[1].isFinalTurn) || JSON.stringify(r.finalScores);
+    });
+    test('House rule: low-score wins count as legs won, not checkouts', () => {
+      const m = mkMatch(HR({ points: 301 }), P2);
+      m.legs[0].events = ev('T20 L S1');
+      m.legs[0].events.push({ t: 'end' });
+      replayMatch(m); m.status = 'finished'; m.endedAt = Date.now();
+      const s = statsX01([m], { range: 'all' });
+      const a = s.rows.find((r) => r.id === 'a');
+      return (a.legsWon === 1 && a.wins === 1 && a.maxCheckout === 0 && a.minDarts === 0 && a.checkouts === 0 && a.locks === 1 && s.hasHouse) || JSON.stringify(a);
+    });
+    test('House rule: Undo across a lock restores normal play', () => {
+      const m = mkMatch(HR({ points: 301 }), P2);
+      m.legs[0].events = ev('T20 L');
+      const before = replayMatch(m).live.phase;
+      undoLast(m);
+      const rs = replayMatch(m);
+      return (before === 'final' && rs.live.phase === 'normal' && rs.live.lockerSeat === null && rs.live.seat === 0 && rs.live.current.darts.length === 1) || rs.live.phase;
+    });
+    test('House rule: Undo of an auto-lock bust restores the bust counter', () => {
+      const m = mkMatch(HR({ points: 50 }), P2);
+      m.legs[0].events = ev('T20 S1 S1 S1 T20');
+      const a = replayMatch(m).live;
+      undoLast(m);
+      const b = replayMatch(m).live;
+      return (a.phase === 'final' && b.phase === 'normal' && b.busts[0] === 1 && b.seat === 0) || JSON.stringify({ a: a.phase, b: b.phase, busts: b.busts });
+    });
+    test('House rule: Lock In hidden in Cricket and during final turns', () => {
+      const x = mkMatch(HR({ points: 301 }), P2);
+      x.legs[0].events = ev('T20 L');
+      const c = mkMatch(Object.assign(CS('standard'), { houseRule: { oneBustLowScore: true, bustAllowance: 1 } }), P2, 'cricket');
+      const y = mkMatch(HR({ points: 301 }), P2);
+      return (!canLockIn(x, replayMatch(x)) && isFinalTurn(x, replayMatch(x)) && !canLockIn(c, replayMatch(c)) && canLockIn(y, replayMatch(y))) || 'lock visibility wrong';
+    });
+    test('Event encoding round-trips', () => {
+      const e = [D('T20'), D('M'), D('Bull'), D('25'), { t: 'tot', v: 99, n: 2 }, { t: 'end' }, { t: 'lock' }];
+      return JSON.stringify(e.map(encodeEvent).map(decodeEvent)) === JSON.stringify(e) || e.map(encodeEvent).map(decodeEvent);
+    });
+    return results;
+  }
+
+  return {
+    APP_VERSION, BOARD_ORDER, RINGS, X01_POINTS, IMPOSSIBLE_CHECKOUTS, SKILL_NAMES, SKILL_TARGET_AVG, SKILL_SIGMA, CRICKET_DEFAULT,
+    dartValue, validDart, dartLabel, parseDartLabel, isPossibleTotal, neededWins, searchRoute, routeString, checkoutRoute, CHECKOUT_TABLE,
+    X01_SECTOR_LABELS, sectorKey, replayMatch, replayX01Leg, replayCricketLeg, undoLast, canLockIn, isFinalTurn, finalTarget,
+    mulberry32, landingDart, throwAt, chooseX01Aim, botAction, SCORING_AIMS,
+    statsX01, statsCricket, matchPlayerTotals, safeDiv, pct, encodeEvent, decodeEvent, runSelfTests, DERIVED_LEG_KEYS,
+  };
+})();
+if (typeof module !== 'undefined') module.exports = DL;
+
+</script>
+<script>
+/* ==========================================================================
+   DART SCOREBOARD: UI (rendering, input, persistence, sheets)
+   Rendering is string templates into three roots (screen, sheet, dialog).
+   All clicks go through one delegated handler keyed by data-act.
+   ========================================================================== */
+(() => {
+  'use strict';
+  const $ = (sel, root) => (root || document).querySelector(sel);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const fmt2 = (n) => (Number.isFinite(n) ? n : 0).toFixed(2);
+  const fmtPct = (n) => fmt2(n) + '%';
+
+  /* ---------- icons ---------- */
+  function gear(cx, cy, r, teeth) {
+    const pts = [], inner = r * 0.78;
+    for (let i = 0; i < teeth * 2; i++) {
+      const rad = i % 2 ? inner : r;
+      const a0 = ((i - 0.35) / (teeth * 2)) * Math.PI * 2, a1 = ((i + 0.35) / (teeth * 2)) * Math.PI * 2;
+      pts.push([cx + rad * Math.sin(a0), cy - rad * Math.cos(a0)], [cx + rad * Math.sin(a1), cy - rad * Math.cos(a1)]);
+    }
+    return 'M' + pts.map((p) => p[0].toFixed(2) + ' ' + p[1].toFixed(2)).join('L') + 'Z';
+  }
+  const sv = (body, extra) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra || ''}>${body}</svg>`;
+  const I = {
+    home: sv('<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5.5v-6h-5v6H4a1 1 0 0 1-1-1z"/>'),
+    players: sv('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.8"/><path d="M16.5 14.6c2.6.1 4.4 1.8 5 4.9"/>'),
+    stats: sv('<rect x="4" y="12" width="4" height="8" rx="1"/><rect x="10" y="5" width="4" height="15" rx="1"/><rect x="16" y="9" width="4" height="11" rx="1"/>'),
+    history: sv('<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4v4.5h4.5"/><path d="M12 7.5V12l3 2"/>'),
+    settings: sv(`<path d="${gear(9, 10, 6.4, 8)}"/><circle cx="9" cy="10" r="2.2"/><path d="${gear(17.6, 17.4, 4.2, 6)}"/><circle cx="17.6" cy="17.4" r="1.3"/>`, 'stroke-width="1.7"'),
+    share: sv('<path d="M12 3v12"/><path d="m7.5 7.5 4.5-4.5 4.5 4.5"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/>'),
+    robotPlus: sv('<rect x="3" y="8" width="12" height="10" rx="2.5"/><path d="M9 8V5"/><circle cx="9" cy="4" r="1"/><circle cx="6.8" cy="12.5" r=".9" fill="currentColor"/><circle cx="11.2" cy="12.5" r=".9" fill="currentColor"/><path d="M7 15.5h4"/><path d="M19.5 9v6M16.5 12h6"/>'),
+    personPlus: sv('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M19 8v6M16 11h6"/>'),
+    trash: sv('<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>'),
+    menu: sv('<path d="M4 7h16M4 12h16M4 17h16"/>'),
+    dart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.6 21.4 8 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M7.2 17.8 6.2 16.8l1-2.2 6.8-6.8 2.2 2.2-6.8 6.8z" fill="currentColor"/><path d="m15 7.4 1.6-4.8 1.3 2.7 2.8 1.2-4.8 1.7z" fill="currentColor"/></svg>`,
+    dia: sv('<circle cx="12" cy="12" r="7"/><path d="M5 19 19 5"/>'),
+    lock: sv('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'),
+    undo: sv('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
+    close: sv('<path d="M6 6l12 12M18 6 6 18"/>'),
+    back: sv('<path d="m15 5-7 7 7 7"/>'),
+    more: sv('<circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/>'),
+    info: sv('<circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".8" fill="currentColor"/>'),
+    edit: sv('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>'),
+    plus: sv('<path d="M12 5v14M5 12h14"/>'),
+    trophy: sv('<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5v1a3 3 0 0 0 3 3M16 6h3v1a3 3 0 0 1-3 3"/><path d="M12 13v4M8.5 20h7M10 17h4v3h-4z"/>'),
+    end: sv('<path d="M5 12h11"/><path d="m12 7 5 5-5 5"/><path d="M20 5v14"/>'),
+    check: sv('<path d="m5 12.5 4.5 4.5L19 7"/>'),
+    target: sv('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>'),
+  };
+  const markSvg = (n) => {
+    if (n <= 0) return '';
+    const slash = '<path d="M7 17 17 7"/>', back = '<path d="M7 7l10 10"/>';
+    if (n === 1) return sv(slash, 'stroke-width="2.6"');
+    if (n === 2) return sv(slash + back, 'stroke-width="2.6"');
+    return sv('<circle cx="12" cy="12" r="9"/>' + slash + back, 'stroke-width="2.4"');
+  };
+  const markText = (n) => (n <= 0 ? 'no marks' : n === 1 ? 'one mark' : n === 2 ? 'two marks' : 'closed');
+
+  /* ---------- names ---------- */
+  const OUT_NAMES = { straight: 'Straight Out', double: 'Double Out', master: 'Master Out' };
+  const IN_NAMES = { straight: 'Straight In', double: 'Double In', master: 'Master In' };
+  const FORMAT_NAMES = { firstTo: 'First to', bestOf: 'Best of' };
+  const SCORING_NAMES = { standard: 'Standard', cutthroat: 'Cut-Throat', noscore: 'No Score' };
+  const HOUSE_NAME = 'One Bust, Low Score';
+  const ORD = ['', 'First', 'Second', 'Third', 'Fourth', 'Fifth'];
+
+  /* ---------- storage (localStorage with in-memory fallback) ---------- */
+  const STORE_KEY = 'dartScoreboard.v1', UI_KEY = 'dartScoreboard.ui';
+  const mem = {};
+  let storageWarned = false;
+  function lsGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return k in mem ? mem[k] : null; } }
+  function lsSet(k, v) {
+    try { window.localStorage.setItem(k, v); } catch (e) {
+      mem[k] = v;
+      if (!storageWarned) { storageWarned = true; toast('Saving is unavailable in this browser. Data lasts until the page closes.'); }
+    }
+  }
+  function ssGet(k) { try { return window.sessionStorage.getItem(k); } catch (e) { return mem['s:' + k] || null; } }
+  function ssSet(k, v) { try { window.sessionStorage.setItem(k, v); } catch (e) { mem['s:' + k] = v; } }
+
+  function defaultStore() {
+    return {
+      v: 1, players: [], matches: [], activeMatchId: null,
+      home: {
+        mode: 'x01', roster: [], randomOrder: false,
+        x01: { points: 501, checkOut: 'straight', checkIn: 'straight', format: 'firstTo', sets: 3, legs: 1, houseRule: { oneBustLowScore: false, bustAllowance: 1 } },
+        cricket: { scoring: 'standard', numbers: 'standard', format: 'firstTo', sets: 3, legs: 1 },
+      },
+      settings: { sound: true, vibration: true, earlyEnd: true, suggestions: true, wakeLock: false, theme: 'system', voice: false, inputMode: 'dart' },
+      statsFilter: { mode: 'x01', range: 'all', hidden: [] },
+      gamesFilter: { mode: 'all', player: '' },
+      lastBackupAt: null,
+    };
+  }
+  function mergeStore(data) {
+    const d = defaultStore();
+    if (!data || typeof data !== 'object') return d;
+    const out = Object.assign(d, {
+      players: Array.isArray(data.players) ? data.players : [],
+      matches: Array.isArray(data.matches) ? data.matches : [],
+      activeMatchId: data.activeMatchId || null,
+    });
+    if (data.home) {
+      out.home = Object.assign(d.home, data.home);
+      out.home.x01 = Object.assign(defaultStore().home.x01, data.home.x01 || {});
+      out.home.x01.houseRule = Object.assign({ oneBustLowScore: false, bustAllowance: 1 }, (data.home.x01 || {}).houseRule || {});
+      out.home.cricket = Object.assign(defaultStore().home.cricket, data.home.cricket || {});
+      if (!Array.isArray(out.home.roster)) out.home.roster = [];
+    }
+    out.settings = Object.assign(d.settings, data.settings || {});
+    out.statsFilter = Object.assign(d.statsFilter, data.statsFilter || {});
+    out.gamesFilter = Object.assign(d.gamesFilter, data.gamesFilter || {});
+    out.lastBackupAt = data.lastBackupAt || null;
+    return out;
+  }
+  function hydrateMatch(m) {
+    m.legs = (m.legs || []).map((l) => ({ events: (l.e || l.events || []).map(DL.decodeEvent).filter(Boolean) }));
+    if (!m.legs.length) m.legs = [{ events: [] }];
+    refresh(m, true);
+    return m;
+  }
+  function serializeMatch(m) {
+    return { id: m.id, createdAt: m.createdAt, updatedAt: m.updatedAt, endedAt: m.endedAt, status: m.status, mode: m.mode,
+      settings: m.settings, players: m.players, winnerId: m.winnerId, legs: m.legs.map((l) => ({ e: l.events.map(DL.encodeEvent) })) };
+  }
+  function serializeStore() { return JSON.stringify(Object.assign({}, store, { matches: store.matches.map(serializeMatch) })); }
+  function save() { lsSet(STORE_KEY, serializeStore()); }
+  let store = defaultStore();
+  function loadStore(fallback) {
+    let data = null;
+    try { const raw = lsGet(STORE_KEY); data = raw ? JSON.parse(raw) : null; } catch (e) { data = null; }
+    if (!data && fallback) { try { data = JSON.parse(fallback); } catch (e) { data = null; } }
+    store = mergeStore(data);
+    store.matches.forEach((m) => { try { hydrateMatch(m); } catch (e) { m._broken = true; } });
+    store.matches = store.matches.filter((m) => !m._broken);
+  }
+
+  /* ---------- match helpers ---------- */
+  function refresh(m, quiet) {
+    const rs = DL.replayMatch(m);
+    Object.defineProperty(m, '_rs', { value: rs, writable: true, configurable: true, enumerable: false });
+    if (rs.winnerId && m.status !== 'finished') { m.status = 'finished'; m.endedAt = m.endedAt || Date.now(); }
+    if (!rs.winnerId && m.status === 'finished') { m.status = 'active'; m.endedAt = null; }
+    if (!quiet) m.updatedAt = Date.now();
+    return rs;
+  }
+  const matchById = (id) => store.matches.find((m) => m.id === id);
+  const activeMatch = () => matchById(store.activeMatchId);
+  const playerById = (id) => store.players.find((p) => p.id === id);
+  const isHouse = (m) => !!(m && m.mode === 'x01' && m.settings.houseRule && m.settings.houseRule.oneBustLowScore);
+  const countTurns = (m) => m.legs.reduce((a, l) => a + (l.turns ? l.turns.length : 0), 0);
+  const cloneForReplay = (m) => ({ mode: m.mode, settings: m.settings, players: m.players, legs: m.legs.map((l) => ({ events: l.events.slice() })) });
+  function legSnapshot(m, li) {
+    const leg = m.legs[li];
+    const starter = Math.max(0, m.players.findIndex((p) => p.id === leg.starterId));
+    return m.mode === 'cricket' ? DL.replayCricketLeg(m.settings, m.players, starter, leg.events) : DL.replayX01Leg(m.settings, m.players, starter, leg.events);
+  }
+  function formatText(S) {
+    const f = FORMAT_NAMES[S.format];
+    if (S.sets > 1) return `${f} ${S.sets} sets` + (S.legs > 1 ? `, ${S.format === 'bestOf' ? 'best of' : 'first to'} ${S.legs} legs each` : '');
+    return `${f} ${S.legs} ${S.legs === 1 ? 'leg' : 'legs'}`;
+  }
+  function settingsSummary(m) {
+    const S = m.settings;
+    if (m.mode === 'cricket') {
+      return `Cricket ${SCORING_NAMES[S.scoring]}, ${S.numbersMode === 'random' ? 'Random numbers' : '15-20 and Bull'}, ${formatText(S)}`;
+    }
+    return `${S.points}, ${S.checkIn !== 'straight' ? IN_NAMES[S.checkIn] + ', ' : ''}${OUT_NAMES[S.checkOut]}, ${formatText(S)}`;
+  }
+  function scoreLine(m) {
+    const rs = m._rs, S = m.settings;
+    const src = S.sets > 1 ? rs.setsWon : rs.legsWonTotal;
+    return m.players.map((p) => src[p.id] || 0).join('-') + (S.sets > 1 ? ' sets' : ' legs');
+  }
+  const nameHtml = (p) => `<span class="${p.isBot ? 'bot-name' : ''}">${esc(p.name)}</span>`;
+  const skillText = (p) => (p.isBot ? `Computer · Level ${p.skill} ${DL.SKILL_NAMES[p.skill]}` : 'Human') + (p.label ? ' · ' + p.label : '');
+
+  /* ---------- feedback: sound, vibration, voice, wake lock ---------- */
+  let audioCtx = null;
+  function beep(freq, dur, type, vol, delay) {
+    if (!store.settings.sound) return;
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const t0 = audioCtx.currentTime + (delay || 0);
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = type || 'sine'; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol || 0.08, t0);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(t0); o.stop(t0 + dur + 0.02);
+    } catch (e) { /* audio unavailable */ }
+  }
+  const sounds = {
+    dart: () => beep(880, 0.05, 'square', 0.03),
+    bust: () => { beep(220, 0.22, 'sawtooth', 0.06); beep(150, 0.3, 'sawtooth', 0.05, 0.18); },
+    win: () => [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.18, 'triangle', 0.07, i * 0.1)),
+    lock: () => { beep(660, 0.12, 'triangle', 0.07); beep(440, 0.2, 'triangle', 0.07, 0.1); },
+  };
+  function vibrate(p) { if (!store.settings.vibration) return; try { navigator.vibrate && navigator.vibrate(p); } catch (e) { /* ignore */ } }
+  function speak(text) {
+    if (!store.settings.voice) return;
+    try { const u = new SpeechSynthesisUtterance(text); window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); } catch (e) { /* ignore */ }
+  }
+  // Ask the browser to protect saved data from automatic cleanup.
+  let persisted = null;
+  async function ensurePersist() {
+    try {
+      if (!navigator.storage || !navigator.storage.persisted) return;
+      persisted = await navigator.storage.persisted();
+      if (!persisted && navigator.storage.persist) persisted = await navigator.storage.persist();
+    } catch (e) { persisted = null; }
+  }
+  const backupStale = () => !store.lastBackupAt || Date.now() - store.lastBackupAt > 7 * 86400000;
+  function markBackup() { store.lastBackupAt = Date.now(); save(); }
+  let wakeLock = null;
+  async function updateWakeLock() {
+    const want = store.settings.wakeLock && ui.screen === 'game';
+    try {
+      if (want && !wakeLock && navigator.wakeLock) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener && wakeLock.addEventListener('release', () => { wakeLock = null; });
+      } else if (!want && wakeLock) { await wakeLock.release(); wakeLock = null; }
+    } catch (e) { wakeLock = null; }
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') updateWakeLock(); });
+
+  /* ---------- ui state ---------- */
+  const ui = {
+    tab: 'home', screen: null, detailId: null, detailFrom: null,
+    sheet: null, dialog: null, review: null, reviewTimer: null,
+    botTimer: null, botKey: '', botFast: false,
+    pad: { mult: 1, buf: '' }, edit: null, infoOpen: false,
+  };
+  function saveUi() { ssSet(UI_KEY, JSON.stringify({ tab: ui.tab, screen: ui.screen, detailId: ui.detailId, detailFrom: ui.detailFrom })); }
+
+  /* ---------- toasts ---------- */
+  function toast(msg, tone) {
+    const root = $('#toast-root'); if (!root) return;
+    const el = document.createElement('div');
+    el.className = 'toast' + (tone ? ' ' + tone : '');
+    el.setAttribute('role', 'status');
+    el.textContent = msg;
+    root.appendChild(el);
+    setTimeout(() => el.remove(), 2600);
+    while (root.children.length > 3) root.firstChild.remove();
+  }
+
+  /* ---------- dialogs ---------- */
+  function confirmBox(opts) {
+    ui.dialog = opts;
+    renderDialog();
+  }
+  function renderDialog() {
+    const root = $('#dialog-root');
+    const d = ui.dialog;
+    if (!d) { root.innerHTML = ''; return; }
+    const buttons = d.buttons || [
+      { label: 'Cancel', style: '', run: null },
+      { label: d.confirm || 'OK', style: d.danger ? 'red' : d.amber ? 'amber' : 'green', run: d.onConfirm },
+    ];
+    d._buttons = buttons;
+    root.innerHTML = `<div class="dialog-wrap" data-act="dialog-bg"><div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlg-t" aria-describedby="dlg-m">
+      <h2 id="dlg-t">${esc(d.title)}</h2>${d.message ? `<p id="dlg-m">${esc(d.message)}</p>` : ''}
+      <div class="btn-row">${buttons.map((b, i) => `<button class="pill-btn ${b.style || ''}" data-act="dialog-btn" data-i="${i}">${esc(b.label)}</button>`).join('')}</div>
+    </div></div>`;
+    const btns = root.querySelectorAll('button');
+    btns[btns.length - 1].focus();
+  }
+  function closeDialog() { ui.dialog = null; renderDialog(); scheduleBot(); }
+
+  /* ---------- sheets ---------- */
+  function openSheet(sheet) { ui.sheet = sheet; renderSheet(true); scheduleBot(); }
+  function closeSheet() {
+    const s = ui.sheet;
+    ui.sheet = null; ui.edit = null; renderSheet();
+    if (s && s.type === 'recap') afterRecap(s);
+    render();
+  }
+  function renderSheet(focus) {
+    const root = $('#sheet-root');
+    const s = ui.sheet;
+    if (!s) { root.innerHTML = ''; return; }
+    const prevFocus = document.activeElement && document.activeElement.id;
+    const scroller = root.querySelector('.sheet');
+    const prevScroll = scroller ? scroller.scrollTop : 0;
+    const r = SHEETS[s.type](s);
+    root.innerHTML = `<div class="overlay" data-act="sheet-bg"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <div class="grabber"></div>
+      <div class="sheet-head"><h2 id="sheet-title" tabindex="-1">${esc(r.title)}</h2>${r.noClose ? '' : `<button class="icon-plain" data-act="sheet-close" aria-label="Close">${I.close}</button>`}</div>
+      ${r.body}</div></div>`;
+    const sh = root.querySelector('.sheet');
+    if (sh) sh.scrollTop = prevScroll;
+    if (prevFocus && document.getElementById(prevFocus)) document.getElementById(prevFocus).focus();
+    else if (focus) { const t = $('#sheet-title'); t && t.focus({ preventScroll: true }); }
+  }
+
+  /* ---------- navigation ---------- */
+  function go(tab) {
+    ui.tab = tab; ui.screen = null; ui.detailId = null; ui.infoOpen = false;
+    saveUi(); render(); window.scrollTo(0, 0); updateWakeLock();
+  }
+  function openGame() { ui.screen = 'game'; ui.botFast = false; saveUi(); render(); updateWakeLock(); }
+  function openDetail(id, from) { ui.screen = 'match'; ui.detailId = id; ui.detailFrom = from || 'games'; saveUi(); render(); window.scrollTo(0, 0); updateWakeLock(); }
+
+  /* ======================================================================
+     RENDER
+     ====================================================================== */
+  function render() {
+    const root = $('#screen-root');
+    let html = '';
+    if (ui.screen === 'game' && activeMatch()) html = renderGame();
+    else if (ui.screen === 'match' && matchById(ui.detailId)) html = renderDetail();
+    else {
+      if (ui.screen) { ui.screen = null; saveUi(); }
+      html = `<main class="app" id="main">${({ home: renderHome, players: renderPlayers, stats: renderStats, games: renderGames, settings: renderSettings })[ui.tab]()}</main>` + renderTabbar();
+    }
+    root.innerHTML = html;
+    if (ui.screen === 'game') {
+      const act = root.querySelector('.pcard.active, .cplayer.active');
+      if (act) act.scrollIntoView({ block: 'nearest' });
+    }
+    scheduleBot();
+  }
+  function renderTabbar() {
+    const tabs = [['home', 'Home', I.home], ['players', 'Players', I.players], ['stats', 'Statistics', I.stats], ['games', 'All Games', I.history], ['settings', 'Settings', I.settings]];
+    return `<nav class="tabbar" aria-label="Main">${tabs.map(([k, l, ic]) =>
+      `<button class="tab" data-act="tab" data-tab="${k}" ${ui.tab === k ? 'aria-current="page"' : ''}>${ic}<span>${l}</span></button>`).join('')}</nav>`;
+  }
+  const seg = (act, opts, cur, cls) => `<div class="seg ${cls || ''}" role="group">${opts.map(([v, l]) =>
+    `<button type="button" data-act="${act}" data-v="${v}" aria-pressed="${String(v) === String(cur)}">${l}</button>`).join('')}</div>`;
+  const topbar = (title, right, left) => `<header class="topbar">${left || '<span></span>'}<h1>${esc(title)}</h1>${right || '<span></span>'}</header>`;
+  const switchHtml = (id, on, act, label, cls) => `<label class="switch ${cls || ''}"><input type="checkbox" role="switch" id="${id}" data-change="${act}" ${on ? 'checked' : ''} aria-label="${esc(label)}"><span></span></label>`;
+
+  /* ---------- home ---------- */
+  function renderHome() {
+    const h = store.home, cfg = h.mode === 'x01' ? h.x01 : h.cricket;
+    const am = activeMatch();
+    const resume = am && am.status !== 'finished' ? `<div class="resume-card"><div><strong>Match in progress</strong><span>${esc(settingsSummary(am))} · ${am.players.map((p) => esc(p.name)).join(', ')}</span></div>
+      <button class="pill-btn green" data-act="resume" data-id="${am.id}">Resume</button></div>` : '';
+    const tile = (label, value, color, act, cls) => `<div class="tile-wrap ${cls || ''}"><span class="tile-label" id="tl-${act}">${label}</span>
+      <button class="tile ${color}" data-act="pick" data-pick="${act}" aria-labelledby="tl-${act} tv-${act}"><span id="tv-${act}">${esc(value)}</span></button></div>`;
+    let tiles;
+    if (h.mode === 'x01') {
+      tiles = [
+        tile('Points', cfg.points, 'green', 'points'), tile('Check-Out', OUT_NAMES[cfg.checkOut], 'red', 'checkOut'), tile('Sets', cfg.sets, 'green', 'sets'),
+        tile('Set/Leg', FORMAT_NAMES[cfg.format], 'green', 'format'), tile('Check-In', IN_NAMES[cfg.checkIn], 'red', 'checkIn'), tile('Legs', cfg.legs, 'green', 'legs'),
+        tile('House Rules', cfg.houseRule.oneBustLowScore ? HOUSE_NAME : 'Off', 'amber' + (cfg.houseRule.oneBustLowScore ? '' : ' off'), 'house', 'full'),
+      ].join('');
+    } else {
+      tiles = [
+        tile('Scoring', SCORING_NAMES[cfg.scoring], 'red', 'scoring'), tile('Numbers', cfg.numbers === 'random' ? 'Random' : '15-20, Bull', 'red', 'numbers'), tile('Sets', cfg.sets, 'green', 'sets'),
+        tile('Set/Leg', FORMAT_NAMES[cfg.format], 'green', 'format', 'span2'), tile('Legs', cfg.legs, 'green', 'legs'),
+      ].join('');
+    }
+    const roster = h.roster.map(playerById).filter(Boolean);
+    const min = h.mode === 'x01' ? 1 : 2, max = h.mode === 'x01' ? 8 : 6;
+    let hint = '';
+    if (roster.length < min) hint = h.mode === 'x01' ? 'Add at least one player to start.' : 'Cricket needs at least 2 players.';
+    else if (roster.length > max) hint = `${h.mode === 'x01' ? 'X01' : 'Cricket'} allows up to ${max} players. Remove ${roster.length - max}.`;
+    const list = roster.length ? `<ul class="list" data-reorder="roster" aria-label="Players in this game">${roster.map((p, i) => `
+      <li class="row" data-idx="${i}">
+        <span class="dart-ic ${i === 0 && !h.randomOrder ? 'on' : ''}" ${i === 0 && !h.randomOrder ? 'title="Throws first"' : ''}>${I.dart}</span>
+        <div class="row-main"><span class="row-name ${p.isBot ? 'bot-name' : ''}">${esc(p.name)}</span><span class="row-sub">${i === 0 && !h.randomOrder ? 'Throws first · ' : ''}${esc(skillText(p))}</span></div>
+        <button class="icon-plain" data-act="roster-remove" data-id="${p.id}" aria-label="Remove ${esc(p.name)} from this game">${I.trash}</button>
+        <button class="drag-handle" data-drag="roster" data-idx="${i}" aria-label="Move ${esc(p.name)}. Drag, or use the up and down arrow keys.">${I.menu}</button>
+      </li>`).join('')}</ul>${h.randomOrder ? '<p class="hint">The order is shuffled when you tap START.</p>' : ''}`
+      : `<div class="empty">${I.target}<strong>Add players to begin</strong>Tap Add Players for people, or the robot button for a computer opponent.</div>`;
+    return `
+      <header class="home-head"><h1>Dart Scoreboard</h1><button class="circle-btn" data-act="share" aria-label="Share the last match">${I.share}</button></header>
+      ${resume}
+      ${seg('home-mode', [['x01', 'X01'], ['cricket', 'Cricket']], h.mode)}
+      <div class="tiles">${tiles}</div>
+      <p class="format-note">${esc(formatText(cfg))}${h.mode === 'x01' && cfg.houseRule.oneBustLowScore ? ` · ${HOUSE_NAME} (${cfg.houseRule.bustAllowance} free ${cfg.houseRule.bustAllowance === 1 ? 'bust' : 'busts'})` : ''}</p>
+      <button class="btn-start" data-act="start" ${hint ? 'disabled aria-describedby="start-hint"' : ''}>START</button>
+      ${hint ? `<p class="hint" id="start-hint">${esc(hint)}</p>` : ''}
+      <div class="home-actions">
+        <label class="check"><input type="checkbox" id="random-order" data-change="random-order" ${h.randomOrder ? 'checked' : ''}><span>Random order</span></label>
+        <button class="sq-btn" data-act="add-bot" aria-label="Add a computer player">${I.robotPlus}</button>
+        <button class="pill-btn green" data-act="add-players">${I.personPlus}<span>Add Players</span></button>
+      </div>
+      <h2 class="section-h">Players</h2>
+      ${list}`;
+  }
+
+  /* ---------- players tab ---------- */
+  function renderPlayers() {
+    const ps = store.players;
+    const body = ps.length ? `<ul class="list" data-reorder="players" aria-label="Saved players">${ps.map((p, i) => `
+      <li class="row" data-idx="${i}">
+        <button class="row-main" data-act="player-edit" data-id="${p.id}" aria-label="Edit ${esc(p.name)}"><span class="row-name ${p.isBot ? 'bot-name' : ''}">${esc(p.name)}</span><span class="row-sub">${esc(skillText(p))}</span></button>
+        <button class="drag-handle" data-drag="players" data-idx="${i}" aria-label="Move ${esc(p.name)}. Drag, or use the up and down arrow keys.">${I.menu}</button>
+      </li>`).join('')}</ul>`
+      : `<div class="empty">${I.players}<strong>No players yet</strong>Add the people you play with, and computer opponents at five skill levels.</div>`;
+    return topbar('Players', `<button class="circle-btn" data-act="player-new" aria-label="Add a player">${I.plus}</button>`) + body;
+  }
+
+  /* ---------- statistics tab ---------- */
+  function statsFilter() {
+    const f = store.statsFilter;
+    return { range: f.range, hidden: f.hidden, order: store.players.map((p) => p.id), now: Date.now() };
+  }
+  function statTable(cols, rows, cells) {
+    return `<div class="table-wrap"><table class="stat"><thead><tr><th scope="col">Players</th>${cols.map((c) => `<th scope="col">${c}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map((r, i) => {
+        const fs = r.name.length > 14 ? 12 : r.name.length > 10 ? 13.5 : 15;
+        return `<tr><td style="font-size:${fs}px"><span class="pidx">${i + 1}.</span><span class="${r.isBot ? 'bot-name' : ''}">${esc(r.name)}</span></td>${cells(r).map((v) => `<td>${v}</td>`).join('')}</tr>`;
+      }).join('')}</tbody></table></div>`;
+  }
+  function sectorChart(title, counts, labels, ticks) {
+    const left = 4, right = 26, top = 10, h = 120, bottom = 22;
+    const W = 344, slot = (W - left - right) / labels.length, H = top + h + bottom;
+    const bw = Math.max(2, Math.min(4, slot * 0.6));
+    const max = Math.max(0, ...counts);
+    const step = max <= 50 ? 10 : max <= 100 ? 20 : max <= 250 ? 50 : max <= 500 ? 100 : Math.ceil(max / 5 / 100) * 100;
+    const yMax = Math.max(step, Math.ceil(max / step) * step);
+    const y = (v) => top + h - (v / yMax) * h;
+    let g = '';
+    for (let v = step; v <= yMax; v += step) {
+      g += `<line x1="${left}" x2="${W - right + 4}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/>`;
+      g += `<text x="${W - right + 8}" y="${y(v) + 4}" font-size="10" fill="var(--muted)">${v}</text>`;
+    }
+    g += `<line x1="${left}" x2="${W - right + 4}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-width="1"/>`;
+    labels.forEach((l, i) => {
+      if (!ticks.includes(l)) return;
+      const x = left + i * slot + slot / 2;
+      g += `<line x1="${x}" x2="${x}" y1="${top}" y2="${y(0)}" stroke="var(--grid)" stroke-dasharray="2 3" stroke-width="1"/>`;
+      g += `<text x="${x}" y="${H - 6}" font-size="10" fill="var(--muted)" text-anchor="middle">${l}</text>`;
+    });
+    counts.forEach((c, i) => {
+      if (!c) return;
+      const x = left + i * slot + slot / 2 - bw / 2;
+      g += `<rect x="${x}" y="${y(c)}" width="${bw}" height="${Math.max(1, y(0) - y(c))}" rx="1" fill="var(--bar)"><title>${labels[i]}: ${c}</title></rect>`;
+    });
+    return `<div class="chart-card"><h3>${title}</h3><div class="chart-scroll"><svg style="width:100%;min-width:300px;height:auto" viewBox="0 0 ${W} ${H}" role="img" aria-label="Hits per sector, highest ${max}">${g}</svg></div></div>`;
+  }
+  function renderStats() {
+    const f = store.statsFilter;
+    const head = topbar('Statistics', `<button class="circle-btn" data-act="stats-filter" aria-label="Choose players and reset statistics">${I.menu}</button>`) +
+      seg('stats-mode', [['x01', 'X01'], ['cricket', 'Cricket']], f.mode) +
+      seg('stats-range', [['today', 'Today'], ['7d', '7 Days'], ['30d', '30 Days'], ['all', 'All time']], f.range, 'small');
+    const sec = (t, inner, extra) => `<h2 class="stat-h">${t}${extra || ''}</h2>${inner}`;
+    const none = '<div class="no-data">No data yet</div>';
+    if (f.mode === 'x01') {
+      const s = DL.statsX01(store.matches, statsFilter());
+      const R = s.rows, ok = s.hasData && R.length;
+      const T = (cols, cells) => (ok ? statTable(cols, R, cells) : none);
+      const info = `<button class="info-btn" data-act="info" aria-expanded="${ui.infoOpen}" aria-label="How checkout percentage is calculated">${I.info}</button>`;
+      let html = head;
+      html += sec('Games', T(['Games', 'Wins', 'Wins %'], (r) => [r.games, r.wins, fmtPct(r.winPct)]));
+      html += sec('Legs', T(['Legs', 'Legs won', 'Legs win %'], (r) => [r.legs, r.legsWon, fmtPct(r.legPct)]));
+      html += sec('Throws', T(['Throws ⌀', 'Double %', 'Triple %'], (r) => [fmt2(r.dartsPerLeg), fmtPct(r.doublePct), fmtPct(r.triplePct)]));
+      html += sec('Average and Highest Score', T(['Average ⌀', 'First-9 ⌀', 'Max Score'], (r) => [fmt2(r.avg), fmt2(r.first9), r.maxScore]));
+      html += sec('Points', T(['60+', '100+', '140+', '180'], (r) => [r.b60, r.b100, r.b140, r.b180]));
+      html += sec('Checkout', (ui.infoOpen ? `<p class="popover" id="co-info">Checkout % is successful checkouts divided by darts thrown while one dart could finish the leg under that match's check-out rule (for Double Out: 40 or less and even, or 50). Legs decided by low score and turns entered as a total do not count. Min Darts is the fewest darts in a leg won by checkout.</p>` : '') +
+        T(['Max Checkout', 'Min Darts', 'Checkout %'], (r) => [r.maxCheckout, r.minDarts || 0, fmtPct(r.checkoutPct)]), info);
+      if (ok && s.hasHouse) {
+        html += sec(HOUSE_NAME, statTable(['Locks', 'Busts', 'Auto-locks', 'Final-round wins'], R, (r) => [r.locks, r.busts, r.autoLocks, `${r.finalWins} / ${r.finalAttempts}`]) +
+          '<p class="hint">Busts count only in house rule matches. Final-round wins are legs won after taking a final turn.</p>');
+      }
+      html += sec('Hits in Sector', ok ? R.map((r, i) => sectorChart(`<span class="pidx">${i + 1}.</span> <span class="${r.isBot ? 'bot-name' : ''}">${esc(r.name)}</span>`, r.sectors, s.labels, s.ticks)).join('') : none);
+      return html;
+    }
+    const s = DL.statsCricket(store.matches, statsFilter());
+    const R = s.rows, ok = s.hasData && R.length;
+    const T = (cols, cells) => (ok ? statTable(cols, R, cells) : none);
+    let html = head;
+    html += sec('Games', T(['Games', 'Wins', 'Wins %'], (r) => [r.games, r.wins, fmtPct(r.winPct)]));
+    html += sec('Legs', T(['Legs', 'Legs won', 'Legs win %'], (r) => [r.legs, r.legsWon, fmtPct(r.legPct)]));
+    html += sec('MPR', T(['MPR ⌀', 'Rounds', 'Darts'], (r) => [fmt2(r.mpr), r.rounds, r.darts]));
+    html += sec('Marks', T(['Marks', 'Triples', 'Bulls'], (r) => [r.marks, r.triples, r.bulls]));
+    html += sec('Points per Round', T(['Points', 'Per round ⌀'], (r) => [r.points, fmt2(r.ppr)]));
+    html += sec('Highest Marks in a Turn', T(['Max marks'], (r) => [r.maxMarks]));
+    html += sec('Hits in Sector', ok ? R.map((r, i) => sectorChart(`<span class="pidx">${i + 1}.</span> <span class="${r.isBot ? 'bot-name' : ''}">${esc(r.name)}</span>`, r.sectors, s.labels, s.ticks)).join('') : none);
+    return html + '<p class="hint">Marks count darts that closed a number or scored on it.</p>';
+  }
+
+  /* ---------- all games tab ---------- */
+  function renderGames() {
+    const gf = store.gamesFilter;
+    const allPlayers = new Map();
+    store.matches.forEach((m) => m.players.forEach((p) => allPlayers.set(p.id, p)));
+    const list = store.matches.filter((m) => (gf.mode === 'all' || m.mode === gf.mode) && (!gf.player || m.players.some((p) => p.id === gf.player)))
+      .slice().sort((a, b) => (b.endedAt || b.updatedAt || b.createdAt) - (a.endedAt || a.updatedAt || a.createdAt));
+    const filters = `<div class="filters">${seg('games-mode', [['all', 'All'], ['x01', 'X01'], ['cricket', 'Cricket']], gf.mode, 'small')}
+      <label class="sr-only" for="games-player">Filter by player</label>
+      <select class="select" id="games-player" data-change="games-player"><option value="">All players</option>${[...allPlayers.values()].map((p) => `<option value="${p.id}" ${gf.player === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>`;
+    const body = list.length ? `<ul class="list">${list.map(gameItem).join('')}</ul>`
+      : `<div class="empty">${I.history}<strong>${store.matches.length ? 'No games match this filter' : 'No games yet'}</strong>${store.matches.length ? 'Try another mode or player.' : 'Finished and unfinished matches appear here.'}</div>`;
+    return topbar('All Games') + (store.matches.length ? filters : '') + body;
+  }
+  function gameItem(m) {
+    const when = new Date(m.endedAt || m.createdAt);
+    const date = when.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const winner = m.players.find((p) => p.id === m.winnerId);
+    const unfinished = m.status !== 'finished';
+    const status = m.status === 'abandoned' ? '<span class="chip muted">Abandoned</span>' : unfinished ? '<span class="chip green">In progress</span>' : '';
+    return `<li class="game-item"><button class="gi-main" data-act="open-match" data-id="${m.id}">
+      <div class="gi-top"><span>${esc(date)}</span><span class="chip">${m.mode === 'x01' ? 'X01' : 'Cricket'}</span>${isHouse(m) ? `<span class="chip amber">${HOUSE_NAME}</span>` : ''}${status}</div>
+      <div class="gi-settings">${esc(settingsSummary(m))}</div>
+      <div class="gi-players">${m.players.map(nameHtml).join(', ')}</div>
+      <div class="gi-result">${winner ? `${I.trophy}${nameHtml(winner)} won · ${esc(scoreLine(m))}` : `Score ${esc(scoreLine(m))}`}</div>
+    </button><div class="gi-actions">${unfinished ? `<button class="pill-btn green" data-act="resume" data-id="${m.id}">Resume</button>` : ''}
+      <button class="icon-plain" data-act="delete-match" data-id="${m.id}" aria-label="Delete this match">${I.trash}</button></div></li>`;
+  }
+
+  /* ---------- match detail ---------- */
+  function renderDetail() {
+    const m = matchById(ui.detailId), rs = m._rs, S = m.settings;
+    const back = `<button class="icon-plain" data-act="detail-back" aria-label="Back">${I.back}</button>`;
+    const winner = m.players.find((p) => p.id === m.winnerId);
+    const unfinished = m.status !== 'finished';
+    const when = new Date(m.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    let html = topbar('Match', ui.detailFrom === 'game' ? '' : `<button class="icon-plain" data-act="delete-match" data-id="${m.id}" aria-label="Delete this match">${I.trash}</button>`, back);
+    html += `<div class="card"><div class="gi-top"><span>${esc(when)}</span><span class="chip">${m.mode === 'x01' ? 'X01' : 'Cricket'}</span>${isHouse(m) ? `<span class="chip amber">${HOUSE_NAME}</span>` : ''}</div>
+      <div class="gi-settings">${esc(settingsSummary(m))}</div><div class="gi-players">${m.players.map(nameHtml).join(', ')}</div>
+      <div class="gi-result">${winner ? `${I.trophy}${nameHtml(winner)} won · ${esc(scoreLine(m))}` : `${m.status === 'abandoned' ? 'Abandoned' : 'In progress'} · ${esc(scoreLine(m))}`}</div>
+      ${unfinished && ui.detailFrom !== 'game' ? `<div class="btn-row"><button class="pill-btn green" data-act="resume" data-id="${m.id}">Resume</button></div>` : ''}
+      ${ui.detailFrom === 'game' ? `<div class="btn-row"><button class="pill-btn green" data-act="detail-back">Back to the game</button></div>` : ''}</div>`;
+    // per-player stats
+    const f = { range: 'all', includeUnfinished: true, order: m.players.map((p) => p.id) };
+    if (m.mode === 'x01') {
+      const s = DL.statsX01([m], f);
+      html += '<h2 class="stat-h">Players</h2>' + statTable(['Avg ⌀', 'First-9', 'Max', 'Legs'], s.rows, (r) => [fmt2(r.avg), fmt2(r.first9), r.maxScore, r.legsWon]);
+      html += '<div style="height:8px"></div>' + statTable(['Darts', '100+', '180', 'Best out'], s.rows, (r) => [r.darts, r.b100 + r.b140, r.b180, r.maxCheckout]);
+    } else {
+      const s = DL.statsCricket([m], f);
+      html += '<h2 class="stat-h">Players</h2>' + statTable(['MPR', 'Marks', 'Points', 'Legs'], s.rows, (r) => [fmt2(r.mpr), r.marks, r.points, r.legsWon]);
+    }
+    // leg timeline
+    const pn = (id) => { const p = m.players.find((x) => x.id === id); return p ? nameHtml(p) : '?'; };
+    html += '<h2 class="stat-h">Legs</h2><div class="card">' + m.legs.map((leg, li) => {
+      if (!leg.turns || (!leg.turns.length && !leg.winnerId && !leg.events.length)) return li === 0 ? '<div class="leg-line">No darts thrown yet.</div>' : '';
+      const lbl = `${S.sets > 1 ? `Set ${leg.setNo} · ` : ''}Leg ${leg.legNo}`;
+      let txt;
+      if (!leg.winnerId) txt = 'In progress';
+      else if (leg.resultType === 'lowScore') txt = `${pn(leg.winnerId)} won on low score (${leg.finalScores[leg.winnerId]} left)`;
+      else if (m.mode === 'x01') { const last = leg.turns[leg.turns.length - 1]; const nd = leg.turns.filter((t) => t.pid === leg.winnerId).reduce((a, t) => a + t.darts.length, 0); txt = `${pn(leg.winnerId)} checked out ${last.start} in ${nd} darts`; }
+      else txt = `${pn(leg.winnerId)} closed out (${leg.finalScores[leg.winnerId]} points)`;
+      if (isHouse(m) && leg.lockerId) {
+        const auto = leg.turns.some((t) => t.autoLocked && t.pid === leg.lockerId);
+        txt += `<br><span class="lock-tag">${I.lock}${pn(leg.lockerId)} ${auto ? 'auto-locked' : 'locked'} at ${leg.lockedScore}</span>`;
+      }
+      if (isHouse(m) && leg.bustCounts) {
+        const b = m.players.filter((p) => leg.bustCounts[p.id]).map((p) => `${esc(p.name)} ${leg.bustCounts[p.id]}`);
+        if (b.length) txt += `<br><span style="color:var(--muted)">Busts: ${b.join(', ')}</span>`;
+      }
+      return `<div class="leg-line"><span class="lno">${lbl}</span><span>${txt}</span></div>`;
+    }).join('') + '</div>';
+    // turn log
+    html += '<h2 class="stat-h">Turn log</h2>';
+    const legsWithTurns = m.legs.map((leg, li) => ({ leg, li })).filter((x) => x.leg.turns && x.leg.turns.length);
+    if (!legsWithTurns.length) html += '<div class="no-data">No turns yet</div>';
+    html += legsWithTurns.map(({ leg, li }, k) => `<details class="turns" ${k === legsWithTurns.length - 1 ? 'open' : ''}><summary>${S.sets > 1 ? `Set ${leg.setNo} · ` : ''}Leg ${leg.legNo}</summary>
+      ${leg.turns.map((t, ti) => {
+        const p = m.players.find((x) => x.id === t.pid);
+        const darts = t.totalEntry ? 'Total' : t.darts.map(DL.dartLabel).join(' ') || '-';
+        let flags = '';
+        if (t.busted) flags += '<span class="flag bust">BUST</span>';
+        if (t.lockedThisTurn) flags += '<span class="flag lock">LOCK</span>';
+        if (t.autoLocked) flags += '<span class="flag lock">AUTO-LOCK</span>';
+        if (t.isFinalTurn) flags += '<span class="flag final">FINAL</span>';
+        if (t.checkout || t.win) flags += '<span class="flag co">OUT</span>';
+        const right = m.mode === 'x01' ? `${t.score} <span style="color:var(--muted)">→ ${t.end}</span>` : `${t.marks} mk${t.points ? ' · ' + t.points : ''}`;
+        return `<div class="trow"><span class="tn">${nameHtml(p)}${flags}</span><span class="td">${esc(darts)}</span><span class="ts">${right}</span>
+          <button class="icon-plain" data-act="edit-turn" data-li="${li}" data-ti="${ti}" aria-label="Edit ${esc(p.name)}'s turn ${ti + 1}">${I.edit}</button></div>`;
+      }).join('')}</details>`).join('');
+    return `<main class="app" id="main">${html}</main>`;
+  }
+
+  /* ---------- settings tab ---------- */
+  function renderSettings() {
+    const s = store.settings;
+    const row = (label, sub, ctl) => `<div class="srow"><span class="grow">${label}${sub ? `<small>${sub}</small>` : ''}</span>${ctl}</div>`;
+    return topbar('Settings') + `
+      <h2 class="group-title">Game</h2><div class="group">
+        ${row('Allow early end turn', 'End a turn before three darts to bank the score', switchHtml('set-early', s.earlyEnd, 'set-earlyEnd', 'Allow early end turn'))}
+        ${row('Checkout suggestions', 'Show a route when a finish is possible', switchHtml('set-sugg', s.suggestions, 'set-suggestions', 'Checkout suggestions'))}
+        ${row('Keep screen awake', 'During a match, where the browser allows it', switchHtml('set-wake', s.wakeLock, 'set-wakeLock', 'Keep screen awake'))}
+      </div>
+      <h2 class="group-title">Feedback</h2><div class="group">
+        ${row('Sound effects', '', switchHtml('set-sound', s.sound, 'set-sound', 'Sound effects'))}
+        ${row('Vibration', 'On devices that support it', switchHtml('set-vib', s.vibration, 'set-vibration', 'Vibration'))}
+        ${row('Voice announcer', 'Reads out each turn score', switchHtml('set-voice', s.voice, 'set-voice', 'Voice announcer'))}
+      </div>
+      <h2 class="group-title">Theme</h2>${seg('theme', [['system', 'System'], ['dark', 'Dark'], ['light', 'Light']], s.theme)}
+      <h2 class="group-title">Data</h2><div class="group">
+        ${row('Saved on this device', persisted === true ? 'Protected from automatic browser cleanup' : persisted === false ? 'This browser may clear it if unused for a while. Keep a backup.' : 'Saved after every dart', `<span class="num" style="color:var(--muted);text-align:right;font-size:13px">${store.matches.filter((m) => m.status === 'finished').length} matches</span>`)}
+        <button class="srow" data-act="export"><span class="grow">Export all data (backup)<small>${store.lastBackupAt ? 'Last backup ' + new Date(store.lastBackupAt).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'No backup yet'}. JSON file with players, matches and settings</small></span></button>
+        <button class="srow" data-act="import"><span class="grow">Import from JSON<small>Replaces the data on this device</small></span></button>
+        <button class="srow danger" data-act="reset-all"><span class="grow">Reset all data</span></button>
+      </div>
+      <h2 class="group-title">Diagnostics</h2><div class="group">
+        <button class="srow" data-act="self-test"><span class="grow">Run self-tests<small>Checks scoring rules, the house rule, bots and statistics</small></span></button>
+        ${row('About', 'Dart Scoreboard', `<span class="num" style="color:var(--muted)">Version ${DL.APP_VERSION}</span>`)}
+      </div>`;
+  }
+
+  /* ======================================================================
+     GAME SCREEN
+     ====================================================================== */
+  function currentReview(m) { return ui.review && ui.review.matchId === m.id ? ui.review : null; }
+  function renderGame() {
+    const m = activeMatch(), rs = m._rs, S = m.settings;
+    const rv = currentReview(m);
+    const over = !rs.live;
+    const legIdx = rv ? rv.legIndex : over ? m.legs.length - 1 : rs.liveIndex;
+    const snap = (rv && rv.legEnded) || over ? legSnapshot(m, legIdx) : rs.live;
+    const activeSeat = rv ? rv.turn.seat : over ? -1 : rs.live.seat;
+    const title = m.mode === 'x01' ? `${S.points} · ${OUT_NAMES[S.checkOut]}` : `Cricket · ${SCORING_NAMES[S.scoring]}`;
+    const sub = `${formatText(S)}${S.sets > 1 ? ` · Set ${m.legs[legIdx].setNo}` : ''} · Leg ${m.legs[legIdx].legNo}`;
+    let html = `<div class="game" data-act="game-bg"><div class="game-inner">
+      <div class="game-top"><button class="icon-plain" data-act="leave-game" aria-label="Leave the match">${I.close}</button>
+        <div class="game-title"><strong>${esc(title)}</strong><span>${esc(sub)}${isHouse(m) ? ' · ' + HOUSE_NAME : ''}</span></div>
+        <button class="icon-plain" data-act="game-log" aria-label="Match log">${I.history}</button></div>`;
+    if (m.mode === 'x01' && snap.phase === 'final') html += finalBanner(m, snap, activeSeat);
+    html += m.mode === 'x01' ? x01Cards(m, rs, snap, rv, activeSeat, legIdx) : cricketBoard(m, rs, snap, rv, activeSeat, legIdx);
+    html += inputPanel(m, rs, rv, over);
+    html += '</div></div>';
+    return html;
+  }
+  function finalBanner(m, live, activeSeat) {
+    const locker = m.players[live.lockerSeat];
+    const chips = live.finalOrder.map((s, k) => {
+      const cls = k < live.finalPos ? 'done' : s === activeSeat && k === live.finalPos ? 'now' : '';
+      return `<span class="${cls}">${esc(m.players[s].name)}</span>`;
+    }).join('');
+    return `<div class="banner" role="status">Final turn: beat ${live.lockedScore} <span style="font-weight:600">(${esc(locker.name)} locked)</span>
+      <div class="tracker" aria-label="Players with a final turn">${chips}</div></div>`;
+  }
+  function x01Cards(m, rs, snap, rv, activeSeat, legIdx) {
+    const S = m.settings, P = m.players, leg = m.legs[legIdx];
+    const totals = DL.matchPlayerTotals(m, rs);
+    const turns = snap.turns;
+    const hr = isHouse(m), allowance = hr ? S.houseRule.bustAllowance : 0;
+    const cards = P.map((p, i) => {
+      const active = i === activeSeat;
+      const compact = P.length >= 4 && !active;
+      const rem = snap.rem[i];
+      let darts = [], total = '', bust = false, dim = false, totalEntry = false;
+      if (active && rv) { darts = rv.turn.darts; bust = rv.turn.busted; totalEntry = rv.turn.totalEntry; total = bust ? 'BUST' : rv.turn.score; }
+      else if (active && snap.current) { darts = snap.current.darts; total = darts.length ? darts.reduce((a, d) => a + (d.scored || 0), 0) : ''; }
+      else {
+        const last = turns.filter((t) => t.pid === p.id).pop();
+        if (last) { darts = last.darts; bust = last.busted; totalEntry = last.totalEntry; total = bust ? 'BUST' : last.score; dim = true; }
+      }
+      const boxes = totalEntry ? `<div class="tbox ${dim ? 'dim' : ''}">Total entry</div>` : `<div class="boxes ${bust ? 'bust' : ''}">${[0, 1, 2].map((k) => {
+        const d = darts[k];
+        return `<span class="dbox ${dim ? 'dim' : ''}">${d ? esc(DL.dartLabel(d)) : ''}</span>`;
+      }).join('')}</div>`;
+      const legDarts = turns.filter((t) => t.pid === p.id).reduce((a, t) => a + t.darts.length, 0) + (snap.current && snap.current.pid === p.id && !rv ? snap.current.darts.length : 0);
+      const avg = DL.safeDiv(totals[p.id].points, totals[p.id].darts) * 3;
+      const starter = leg.starterId === p.id;
+      let hrLine = '';
+      if (hr) {
+        const b = snap.busts[i];
+        hrLine = `<div class="pc-hr"><span>Busts ${b}/${allowance}</span>${Array.from({ length: allowance }, (_, k) => `<span class="pip ${k < b ? 'on' : ''}"></span>`).join('')}
+          ${snap.lockerSeat === i ? `<span class="lock-tag">${I.lock}${snap.lockedScore}</span>` : ''}</div>`;
+      }
+      const won = snap.winnerSeat === i;
+      const counters = `${S.sets > 1 ? `<span class="kv"><span class="lbl">Sets:</span><b>${rs.setsWon[p.id]}</b></span>` : ''}<span class="kv"><span class="lbl">Legs:</span><b>${rs.legsWonSet[p.id]}</b></span>`;
+      return `<section class="pcard ${active ? 'active' : ''} ${compact ? 'compact' : ''} ${won ? 'winner' : ''}" aria-label="${esc(p.name)}, ${rem} remaining${active ? ', throwing' : ''}">
+        <div class="pc-left"><div class="pc-score ${rem >= 1000 ? 'd4' : ''}">${rem}</div><div class="pc-name">${starter ? I.dart : ''}<span class="nm ${p.isBot ? 'bot-name' : ''}">${esc(p.name)}</span></div>${compact ? '' : hrLine}</div>
+        <div class="pc-mid">${boxes}<div class="pc-total ${bust ? 'bust' : ''}">${total}</div></div>
+        <div class="pc-right"><span class="counters">${counters}</span>
+          <span class="kv kv-darts">${I.dart}<b>${legDarts}</b></span><span class="kv">${I.dia}<b>${fmt2(avg)}</b></span>${compact && hr ? `<span class="kv"><span class="lbl">Busts</span><b>${snap.busts[i]}</b>${snap.lockerSeat === i ? `<span class="lock-tag">${I.lock}</span>` : ''}</span>` : ''}</div>
+      </section>`;
+    }).join('');
+    return `<div class="cards" id="cards">${cards}</div>`;
+  }
+  function cricketBoard(m, rs, snap, rv, activeSeat, legIdx) {
+    const P = m.players, S = m.settings, leg = m.legs[legIdx];
+    const totals = DL.matchPlayerTotals(m, rs);
+    const nums = snap.nums;
+    const head = `<div class="crow head" style="--cols:${P.length}"><div></div>${P.map((p, i) => {
+      const mpr = DL.safeDiv(totals[p.id].marks, totals[p.id].darts) * 3;
+      return `<div class="cplayer ${i === activeSeat ? 'active' : ''}"><div class="nm">${leg.starterId === p.id ? I.dart : ''}<span class="${p.isBot ? 'bot-name' : ''}">${esc(p.name)}</span></div>
+        <div class="pts">${snap.points[i]}</div><div class="sub">MPR ${fmt2(mpr)}</div><div class="sub">${S.sets > 1 ? `S ${rs.setsWon[p.id]} · ` : ''}L ${rs.legsWonSet[p.id]}</div></div>`;
+    }).join('')}</div>`;
+    const rows = nums.map((x) => `<div class="crow ${snap.dead[x] ? 'dead' : ''}" style="--cols:${P.length}"><div class="cnum">${x === 25 ? 'Bull' : x}</div>${P.map((p, i) =>
+      `<div class="cmark" role="img" aria-label="${esc(p.name)} ${x === 25 ? 'Bull' : x}: ${markText(snap.marks[i][x])}">${markSvg(snap.marks[i][x])}</div>`).join('')}</div>`).join('');
+    let strip = '';
+    if (activeSeat >= 0) {
+      const p = P[activeSeat];
+      const t = rv ? rv.turn : snap.current;
+      const darts = t ? t.darts : [];
+      strip = `<div class="turn-strip"><span class="who ${p.isBot ? 'bot-name' : ''}">${esc(p.name)}</span><div class="boxes">${[0, 1, 2].map((k) => `<span class="dbox">${darts[k] ? esc(DL.dartLabel(darts[k])) : ''}</span>`).join('')}</div>
+        <span class="pc-total">${t ? t.marks : 0} mk</span></div>`;
+    }
+    return `<div class="cards" id="cards"><div class="cboard">${head}${rows}</div></div>${strip}`;
+  }
+  function suggestionLine(m, rs) {
+    const live = rs.live, S = m.settings, seat = live.seat, rem = live.rem[seat];
+    const dartsLeft = 3 - live.current.darts.length;
+    if (live.phase === 'final') {
+      const target = DL.finalTarget(live);
+      const leader = target === live.lockedScore ? m.players[live.lockerSeat].name : m.players[live.finalOrder.slice(0, live.finalPos).find((s) => live.rem[s] === target)].name;
+      if (rem < target) return `<div class="suggest amber">You are below ${target}. End the turn to keep ${rem}.</div>`;
+      const need = rem - target + 1;
+      const route = S.checkOut && store.settings.suggestions ? DL.checkoutRoute(rem, S.checkOut, dartsLeft) : null;
+      return `<div class="suggest amber">Need to score at least ${need} to beat ${target}${leader ? ' (' + esc(leader) + ')' : ''}${route ? ` · Out: ${esc(DL.routeString(route))}` : ''}</div>`;
+    }
+    if (!live.checked[seat]) return `<div class="suggest muted">${S.checkIn === 'double' ? 'Hit a double to start scoring' : 'Hit a double or triple to start scoring'}</div>`;
+    if (!store.settings.suggestions) return '<div class="suggest"></div>';
+    const route = rem <= 180 ? DL.checkoutRoute(rem, S.checkOut, dartsLeft) : null;
+    return `<div class="suggest">${route ? 'Checkout: ' + esc(DL.routeString(route)) : ''}</div>`;
+  }
+  function inputPanel(m, rs, rv, over) {
+    if (over) {
+      return `<div class="input-panel"><div class="bot-note">Match over</div><div class="actions">
+        <button data-act="undo">${I.undo}Undo</button><button data-act="open-recap">Summary</button></div></div>`;
+    }
+    const live = rs.live, S = m.settings, p = m.players[live.seat];
+    const cur = live.current;
+    const legEndReview = rv && rv.legEnded;
+    const isBot = p.isBot;
+    const hr = isHouse(m);
+    const finalTurn = live.phase === 'final';
+    let html = '<div class="input-panel">';
+    html += m.mode === 'x01' ? suggestionLine(m, rs) : '';
+    const mode = m.mode === 'x01' ? store.settings.inputMode : 'dart';
+    if (isBot) {
+      html += `<button class="bot-note" data-act="bot-fast" style="width:100%">${esc(p.name)} is throwing. Tap to speed up.</button>`;
+    } else if (mode === 'total') {
+      html += totalPad('game', ui.pad.buf, legEndReview);
+    } else {
+      html += dartPad('game', m, ui.pad.mult, legEndReview);
+    }
+    const canEnd = (store.settings.earlyEnd || finalTurn) && !isBot && !rv && (cur.darts.length > 0 || finalTurn);
+    const hasEvents = m.legs.some((l) => l.events.length);
+    html += `<div class="actions">
+      <button data-act="undo" ${hasEvents ? '' : 'disabled'} aria-label="Undo the last dart">${I.undo}Undo</button>
+      ${store.settings.earlyEnd || finalTurn ? `<button data-act="end-turn" ${canEnd ? '' : 'disabled'}>${I.end}End Turn</button>` : ''}
+      ${hr && live.phase === 'normal' ? `<button class="lock" data-act="lock-in" ${!isBot && !rv ? '' : 'disabled'}>${I.lock}Lock In</button>` : ''}
+      <button class="more" data-act="game-menu" aria-label="Match menu">${I.more}</button></div>`;
+    return html + '</div>';
+  }
+  function dartPad(target, m, mult, disabled) {
+    const dis = disabled ? 'disabled' : '';
+    const multRow = `<div class="mult" role="group" aria-label="Multiplier">${[[1, 'Single'], [2, 'Double'], [3, 'Triple']].map(([v, l]) =>
+      `<button class="${v === 3 ? 'triple' : ''}" data-act="mult" data-target="${target}" data-v="${v}" aria-pressed="${mult === v}" ${dis}>${l}</button>`).join('')}</div>`;
+    const key = (s, label, cls, extraDis) => `<button class="key ${cls || ''}" data-act="dart" data-target="${target}" data-s="${s}" ${dis || extraDis ? 'disabled' : ''}>${label}</button>`;
+    if (m.mode === 'cricket') {
+      const nums = m.settings.numbers.filter((x) => x !== 25).slice().sort((a, b) => b - a);
+      return multRow + `<div class="pad cricket">${nums.map((n) => key(n, n)).join('')}${key(0, 'Miss', 'miss')}${key('25', '25', '', mult === 3 ? 'disabled' : '')}${key('bull', 'Bull', '', mult === 3 ? 'disabled' : '')}</div>`;
+    }
+    let keys = '';
+    for (let n = 1; n <= 20; n++) keys += key(n, n);
+    keys += key('25', '25', '', mult === 3 ? 'disabled' : '');
+    keys += key(0, 'Miss', 'miss span3') + key('bull', 'Bull', 'span2', mult === 3 ? 'disabled' : '');
+    keys += `<button class="key span2" data-act="input-mode" data-target="${target}" data-v="total" ${dis}>Total</button>`;
+    return multRow + `<div class="pad">${keys}</div>`;
+  }
+  function totalPad(target, buf, disabled) {
+    const dis = disabled ? 'disabled' : '';
+    const k = (v, l, cls) => `<button class="key ${cls || ''}" data-act="tkey" data-target="${target}" data-v="${v}" ${dis}>${l}</button>`;
+    return `<div class="total-display ${buf ? '' : 'placeholder'}" aria-live="polite">${buf || 'Enter the turn total'}</div>
+      <div class="pad keypad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => k(n, n)).join('')}${k('del', '⌫')}${k(0, '0')}${k('ok', 'Enter', 'green')}</div>
+      <button class="key" data-act="input-mode" data-target="${target}" data-v="dart" ${dis}>Enter darts one by one</button>`;
+  }
+
+  /* ---------- game actions ---------- */
+  function clearReview() {
+    if (ui.reviewTimer) clearTimeout(ui.reviewTimer);
+    ui.reviewTimer = null;
+    ui.review = null;
+  }
+  function applyEvent(ev) {
+    const m = activeMatch();
+    if (!m || !m._rs.live) return;
+    clearReview();
+    const before = countTurns(m), beforeLeg = m._rs.liveIndex;
+    m.legs[m.legs.length - 1].events.push(ev);
+    const rs = refresh(m);
+    save();
+    let turn = null, legEnded = false;
+    if (countTurns(m) > before) {
+      const leg = m.legs[beforeLeg];
+      turn = leg.turns[leg.turns.length - 1];
+      legEnded = !!leg.winnerId;
+    }
+    feedback(m, ev, turn, legEnded, beforeLeg);
+    if (!rs.live || !m.players[rs.live.seat].isBot) ui.botFast = false;
+    if (m.status === 'finished') ensurePersist();
+    if (turn) {
+      ui.review = { matchId: m.id, legIndex: beforeLeg, turn, legEnded };
+      ui.reviewTimer = setTimeout(endReview, 700);
+    }
+    render();
+  }
+  function endReview() {
+    const rv = ui.review;
+    ui.review = null; ui.reviewTimer = null;
+    const m = activeMatch();
+    if (rv && rv.legEnded && m && ui.screen === 'game') { openSheet({ type: 'recap', matchId: m.id, legIndex: rv.legIndex }); }
+    render();
+  }
+  function feedback(m, ev, turn, legEnded, legIdx) {
+    if (ev.t === 'd' || ev.t === 'tot') { sounds.dart(); vibrate(12); }
+    if (!turn) return;
+    const p = m.players.find((x) => x.id === turn.pid);
+    const leg = m.legs[legIdx];
+    if (m.mode === 'cricket') {
+      if (legEnded) { sounds.win(); vibrate([40, 40, 120]); speak('Game shot'); }
+      else speak(turn.marks === 1 ? '1 mark' : `${turn.marks} marks`);
+      return;
+    }
+    if (turn.busted) {
+      sounds.bust(); vibrate([60, 40, 60]);
+      if (turn.autoLocked) { toast(`${ORD[turn.bustNumber] || 'Another'} bust: ${p.name} is locked in at ${turn.end}`, 'amber'); speak(`Bust. ${p.name} is locked in at ${turn.end}`); }
+      else if (isHouse(m) && !turn.isFinalTurn) { toast(`Bust. Free bust ${turn.bustNumber} of ${m.settings.houseRule.bustAllowance} used`, 'red'); speak('Bust'); }
+      else { toast('Bust', 'red'); speak('Bust'); }
+    } else if (turn.lockedThisTurn) {
+      sounds.lock(); toast(`${p.name} locked in at ${turn.end}. Everyone else gets one more turn.`, 'amber'); speak(`${p.name} locks in at ${turn.end}`);
+    } else if (turn.checkout) {
+      sounds.win(); vibrate([40, 40, 120]); speak('Game shot');
+    } else {
+      speak(turn.score === 180 ? 'One hundred and eighty' : String(turn.score));
+    }
+    if (legEnded && leg.resultType === 'lowScore') {
+      const w = m.players.find((x) => x.id === leg.winnerId);
+      sounds.win(); toast(`${w.name} wins the leg on low score (${leg.finalScores[w.id]})`, 'amber');
+    }
+  }
+  function doUndo() {
+    const m = activeMatch();
+    if (!m) return;
+    clearReview();
+    if (!DL.undoLast(m)) return;
+    refresh(m); save();
+    if (ui.sheet && ui.sheet.type === 'recap') { ui.sheet = null; renderSheet(); }
+    ui.botFast = false;
+    render();
+  }
+  function afterRecap(s) {
+    const m = matchById(s.matchId);
+    if (m && m.status === 'finished' && s.done) { store.activeMatchId = null; save(); go('home'); }
+  }
+
+  /* ---------- bots ---------- */
+  function scheduleBot() {
+    const m = activeMatch();
+    const ok = ui.screen === 'game' && m && m._rs.live && !ui.review && !ui.sheet && !ui.dialog && m.players[m._rs.live.seat].isBot;
+    if (!ok) { if (ui.botTimer) clearTimeout(ui.botTimer); ui.botTimer = null; ui.botKey = ''; return; }
+    const key = m.id + ':' + m.legs.length + ':' + m.legs[m.legs.length - 1].events.length + ':' + ui.botFast;
+    if (ui.botTimer && ui.botKey === key) return;
+    if (ui.botTimer) clearTimeout(ui.botTimer);
+    ui.botKey = key;
+    const delay = ui.botFast ? 90 : 600 + Math.random() * 300;
+    ui.botTimer = setTimeout(() => {
+      ui.botTimer = null; ui.botKey = '';
+      const mm = activeMatch();
+      if (!mm || !mm._rs.live || ui.screen !== 'game' || ui.sheet || ui.dialog || ui.review) return;
+      if (!mm.players[mm._rs.live.seat].isBot) return;
+      applyEvent(DL.botAction(mm, mm._rs));
+    }, delay);
+  }
+
+  /* ---------- starting a match ---------- */
+  function startMatch() {
+    const h = store.home, mode = h.mode;
+    const roster = h.roster.map(playerById).filter(Boolean);
+    const order = roster.slice();
+    if (h.randomOrder) for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+    let settings;
+    if (mode === 'x01') settings = JSON.parse(JSON.stringify(h.x01));
+    else {
+      const c = h.cricket;
+      let numbers = DL.CRICKET_DEFAULT.slice();
+      if (c.numbers === 'random') {
+        const pool = Array.from({ length: 20 }, (_, i) => i + 1);
+        for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+        numbers = pool.slice(0, 6).sort((a, b) => b - a).concat(25);
+      }
+      settings = { scoring: c.scoring, numbers, numbersMode: c.numbers, format: c.format, sets: c.sets, legs: c.legs };
+    }
+    const now = Date.now();
+    const m = { id: uid(), createdAt: now, updatedAt: now, endedAt: null, status: 'active', mode, settings,
+      players: order.map((p) => ({ id: p.id, name: p.name, isBot: !!p.isBot, skill: p.isBot ? p.skill : null })), legs: [{ events: [] }], winnerId: null };
+    refresh(m);
+    store.matches.unshift(m);
+    store.activeMatchId = m.id;
+    save();
+    ui.pad = { mult: 1, buf: '' };
+    openGame();
+    if (h.randomOrder) toast(`${order[0].name} throws first`);
+  }
+
+  function submitTotal() {
+    const m = activeMatch(); if (!m || !m._rs.live) return;
+    const v = parseInt(ui.pad.buf, 10);
+    if (!Number.isFinite(v)) return;
+    if (!DL.isPossibleTotal(v)) { toast(`${v} is not possible with three darts`, 'red'); return; }
+    const live = m._rs.live, S = m.settings, rem = live.rem[live.seat];
+    ui.pad.buf = '';
+    const checkedAfter = live.checked[live.seat] || v > 0;
+    if (checkedAfter && rem - v === 0) {
+      const opts = [1, 2, 3].filter((n) => (S.checkOut === 'straight' ? v <= 60 * n : DL.searchRoute(v, S.checkOut, n)));
+      if (opts.length > 1) { openSheet({ type: 'checkoutDarts', v, opts }); return; }
+      if (opts.length === 1) { applyEvent({ t: 'tot', v, n: opts[0] }); return; }
+    }
+    applyEvent({ t: 'tot', v, n: 3 });
+  }
+
+  /* ---------- edit turn ---------- */
+  function openEditTurn(m, li, ti) {
+    const t = m.legs[li].turns[ti];
+    ui.edit = { matchId: m.id, li, ti, darts: t.totalEntry ? [] : t.darts.map((d) => ({ s: d.s, m: d.m })), mode: t.totalEntry ? 'total' : 'dart',
+      buf: '', mult: 1, totalDarts: t.darts.length };
+    const first = m.legs[li].events[t.evStart];
+    if (t.totalEntry && first && first.t === 'tot') ui.edit.buf = String(first.v);
+    openSheet({ type: 'edit' });
+  }
+  // Would this list of darts end the turn early (bust or checkout) before the last one?
+  function editTurnEnds(m, t, darts) {
+    if (m.mode !== 'x01') return false;
+    const S = Object.assign({}, m.settings, { points: t.start, checkIn: t.startCheckedIn ? 'straight' : m.settings.checkIn, houseRule: { oneBustLowScore: false } });
+    const r = DL.replayX01Leg(S, [{ id: 'x' }], 0, darts.map((d) => ({ t: 'd', s: d.s, m: d.m })));
+    return r.turns.length > 0 || r.winnerId !== null;
+  }
+  function saveEdit(force) {
+    const e = ui.edit, m = matchById(e.matchId);
+    const leg = m.legs[e.li], t = leg.turns[e.ti];
+    let ev;
+    if (e.mode === 'total') {
+      const v = parseInt(e.buf, 10);
+      if (!DL.isPossibleTotal(v)) { toast('Enter a total that three darts can score', 'red'); return; }
+      ev = [{ t: 'tot', v, n: Math.max(1, Math.min(3, e.totalDarts || 3)) }];
+    } else {
+      ev = e.darts.map((d) => ({ t: 'd', s: d.s, m: d.m }));
+      if (e.darts.length < 3) ev.push(t.lockedThisTurn ? { t: 'lock' } : { t: 'end' });
+      else if (t.lockedThisTurn) toast('A full three-dart turn cannot also lock in. The lock was removed.');
+    }
+    const trial = cloneForReplay(m);
+    const tryApply = (evs) => { const c = cloneForReplay(m); c.legs[e.li].events.splice(t.evStart, t.evEnd - t.evStart, ...evs); DL.replayMatch(c); return c; };
+    let c = tryApply(ev);
+    const ct = (c.legs[e.li].turns || []).find((x) => x.evStart === t.evStart);
+    if (ct && ct.evEnd - ct.evStart < ev.length) { ev = ev.slice(0, ct.evEnd - ct.evStart); c = tryApply(ev); }
+    DL.replayMatch(trial);
+    const sig = (mm) => mm.legs.map((l, i) => `${l.winnerId}:${i > e.li ? l.events.length : ''}`).join(',') + '#' + mm.legs.length;
+    const changed = sig(trial) !== sig(c);
+    const apply = () => {
+      leg.events.splice(t.evStart, t.evEnd - t.evStart, ...ev);
+      refresh(m); save();
+      if (m.status !== 'finished' && m.status !== 'abandoned') store.activeMatchId = store.activeMatchId || m.id;
+      ui.sheet = null; ui.edit = null; renderSheet(); render();
+      toast('Turn updated');
+    };
+    if (changed && !force) {
+      confirmBox({ title: 'This edit changes a leg result', message: 'Turns that no longer fit after this change will be removed.', confirm: 'Save edit', danger: true, onConfirm: apply });
+    } else apply();
+  }
+
+  /* ======================================================================
+     SHEETS
+     ====================================================================== */
+  const optBtn = (act, v, label, pressed, cls, dis) => `<button type="button" class="opt ${cls || ''}" data-act="${act}" data-v="${v}" aria-pressed="${pressed}" ${dis ? 'disabled' : ''}>${label}</button>`;
+  const homeCfg = () => (store.home.mode === 'x01' ? store.home.x01 : store.home.cricket);
+  const SHEETS = {
+    points() {
+      const x = store.home.x01;
+      const custom = !DL.X01_POINTS.includes(x.points);
+      return { title: 'Points', body: `<div class="opt-grid">${DL.X01_POINTS.map((p) => optBtn('set-points', p, p, x.points === p)).join('')}</div>
+        <div class="field"><label for="custom-points">Custom (2 to 9999)</label><div class="inline"><input class="input" id="custom-points" inputmode="numeric" type="number" min="2" max="9999" value="${custom ? x.points : ''}" placeholder="e.g. 170">
+        <button class="pill-btn green" data-act="set-points-custom">Use</button></div></div>` };
+    },
+    checkOut() {
+      const x = store.home.x01;
+      const d = { straight: 'Any dart that reaches exactly zero wins.', double: 'The last dart must be a double. Bull counts as a double.', master: 'The last dart must be a double or a triple. Bull counts.' };
+      return { title: 'Check-Out', body: `<div class="opt-list">${Object.keys(OUT_NAMES).map((k) => optBtn('set-checkOut', k, `${OUT_NAMES[k]}<small>${d[k]}</small>`, x.checkOut === k, 'red')).join('')}</div>` };
+    },
+    checkIn() {
+      const x = store.home.x01;
+      const d = { straight: 'Every dart scores from the start.', double: 'Nothing scores until you hit a double. Bull counts.', master: 'Nothing scores until a double or triple. Bull counts.' };
+      return { title: 'Check-In', body: `<div class="opt-list">${Object.keys(IN_NAMES).map((k) => optBtn('set-checkIn', k, `${IN_NAMES[k]}<small>${d[k]}</small>`, x.checkIn === k, 'red')).join('')}</div>` };
+    },
+    sets() { return countSheet('Sets', 'sets'); },
+    legs() { return countSheet('Legs', 'legs'); },
+    format() {
+      const c = homeCfg();
+      return { title: 'Set/Leg', body: `<div class="opt-list">${optBtn('set-format', 'firstTo', 'First to<small>First to N sets or legs wins.</small>', c.format === 'firstTo')}
+        ${optBtn('set-format', 'bestOf', 'Best of<small>Best of N means first to more than half. Only odd numbers.</small>', c.format === 'bestOf')}</div>` };
+    },
+    house() {
+      const hr = store.home.x01.houseRule;
+      return { title: 'House Rules', body: `
+        <div class="srow" style="padding:0"><span class="grow"><b>${HOUSE_NAME}</b><small>X01 only. Off by default.</small></span>${switchHtml('hr-on', hr.oneBustLowScore, 'hr-toggle', HOUSE_NAME, 'amber')}</div>
+        <ul class="rule-list">
+          <li>Play normal X01. Reaching exactly zero with a valid checkout still wins the leg at once.</li>
+          <li>Busts work as usual (score goes back, turn ends). The first ${hr.bustAllowance === 1 ? 'bust is' : hr.bustAllowance + ' busts are'} free.</li>
+          <li>The next bust also locks you in at the score you went back to.</li>
+          <li>On your turn you can tap <b>Lock In</b> to stop at your current score.</li>
+          <li>After the first lock, every other player gets exactly one more turn. Lowest remaining score wins the leg.</li>
+          <li>Ties go to the player who locked. Between other players, the earlier thrower wins the tie.</li>
+        </ul>
+        <div class="field"><span class="lbl" id="hr-allow-l">Busts allowed before auto-lock</span><div class="stepper" role="group" aria-labelledby="hr-allow-l">
+          <button data-act="hr-allow" data-v="-1" aria-label="Fewer busts" ${hr.bustAllowance <= 1 ? 'disabled' : ''}>−</button><output aria-live="polite">${hr.bustAllowance}</output>
+          <button data-act="hr-allow" data-v="1" aria-label="More busts" ${hr.bustAllowance >= 3 ? 'disabled' : ''}>+</button></div></div>` };
+    },
+    scoring() {
+      const c = store.home.cricket;
+      const d = { standard: 'Points go to you. Close all seven with the higher or equal score to win.', cutthroat: 'Points go to opponents who are still open. Close all with the lowest score to win.', noscore: 'No points. First to close all seven wins.' };
+      return { title: 'Scoring', body: `<div class="opt-list">${Object.keys(SCORING_NAMES).map((k) => optBtn('set-scoring', k, `${SCORING_NAMES[k]}<small>${d[k]}</small>`, c.scoring === k, 'red')).join('')}</div>` };
+    },
+    numbers() {
+      const c = store.home.cricket;
+      return { title: 'Numbers', body: `<div class="opt-list">${optBtn('set-numbers', 'standard', '15 to 20 and Bull<small>The standard board.</small>', c.numbers === 'standard', 'red')}
+        ${optBtn('set-numbers', 'random', 'Random Numbers<small>Six random numbers plus Bull, drawn at START.</small>', c.numbers === 'random', 'red')}</div>` };
+    },
+    addPlayers() {
+      const r = new Set(store.home.roster);
+      const ps = store.players;
+      return { title: 'Add Players', body: `${ps.length ? `<ul class="list" style="margin-bottom:8px">${ps.map((p) => `<li class="row"><label class="check" style="padding-right:10px"><input type="checkbox" data-change="roster-toggle" data-id="${p.id}" ${r.has(p.id) ? 'checked' : ''}>
+          <span class="row-main" style="min-height:0"><span class="row-name ${p.isBot ? 'bot-name' : ''}">${esc(p.name)}</span><span class="row-sub">${esc(skillText(p))}</span></span></label></li>`).join('')}</ul>` : '<p style="color:var(--muted)">No saved players yet. Create one below.</p>'}
+        <form class="field" data-form="new-player"><label for="np-name">New player</label><div class="inline"><input class="input" id="np-name" maxlength="24" placeholder="Name" autocomplete="off"><button class="pill-btn green" type="submit">Add</button></div></form>
+        <div class="btn-row"><button class="pill-btn green" data-act="sheet-close">Done</button></div>` };
+    },
+    addBot() {
+      const r = new Set(store.home.roster);
+      const bots = store.players.filter((p) => p.isBot && !r.has(p.id));
+      const s = ui.sheet.skill || 3;
+      return { title: 'Computer player', body: `${bots.length ? `<p class="lbl" style="color:var(--muted);font-weight:700;font-size:13px">Saved computer players</p><div class="opt-list">${bots.map((b) => `<button class="opt" data-act="bot-pick" data-id="${b.id}"><span class="bot-name">${esc(b.name)}</span><small>Level ${b.skill} ${DL.SKILL_NAMES[b.skill]}</small></button>`).join('')}</div>` : ''}
+        <div class="field"><span class="lbl">New computer player: skill level</span><div class="opt-list">${[1, 2, 3, 4, 5].map((k) => optBtn('bot-skill', k, `Level ${k} · ${DL.SKILL_NAMES[k]}<small>About ${DL.SKILL_TARGET_AVG[k]} three-dart average</small>`, s === k)).join('')}</div></div>
+        <div class="btn-row"><button class="pill-btn green" data-act="bot-create">Add ${esc(nextBotName())}</button></div>` };
+    },
+    playerForm(s) {
+      const p = s.id ? playerById(s.id) : { name: '', isBot: false, skill: 3, label: '' };
+      const isBot = s.isBot !== undefined ? s.isBot : p.isBot;
+      const skill = s.skill || p.skill || 3;
+      return { title: s.id ? 'Edit player' : 'New player', body: `<form data-form="player">
+        <div class="field"><label for="pf-name">Name</label><input class="input" id="pf-name" maxlength="24" value="${esc(s.name !== undefined ? s.name : p.name)}" placeholder="${isBot ? esc(nextBotName()) : 'Name'}" autocomplete="off"></div>
+        <div class="field"><span class="lbl">Type</span>${seg('pf-type', [['human', 'Human'], ['bot', 'Computer']], isBot ? 'bot' : 'human')}</div>
+        ${isBot ? `<div class="field"><span class="lbl">Skill level</span><div class="opt-grid" style="grid-template-columns:repeat(5,1fr)">${[1, 2, 3, 4, 5].map((k) => optBtn('pf-skill', k, k, skill === k)).join('')}</div><small style="color:var(--muted)">${DL.SKILL_NAMES[skill]}, about ${DL.SKILL_TARGET_AVG[skill]} average</small></div>` : ''}
+        <div class="field"><label for="pf-label">Label (optional)</label><input class="input" id="pf-label" maxlength="20" value="${esc(s.label !== undefined ? s.label : p.label || '')}" placeholder="For example Left or Right handed" autocomplete="off"></div>
+        <div class="btn-row">${s.id ? `<button type="button" class="pill-btn red" data-act="player-delete" data-id="${s.id}">Delete</button>` : ''}<button type="submit" class="pill-btn green">Save</button></div></form>` };
+    },
+    statsFilter() {
+      const seen = new Map();
+      store.players.forEach((p) => seen.set(p.id, p));
+      store.matches.forEach((m) => m.players.forEach((p) => { if (!seen.has(p.id)) seen.set(p.id, p); }));
+      const hidden = new Set(store.statsFilter.hidden);
+      return { title: 'Statistics', body: `<p class="lbl" style="color:var(--muted);font-weight:700;font-size:13px">Players shown</p>
+        ${seen.size ? `<ul class="list">${[...seen.values()].map((p) => `<li class="row"><label class="check"><input type="checkbox" data-change="stats-player" data-id="${p.id}" ${hidden.has(p.id) ? '' : 'checked'}><span class="${p.isBot ? 'bot-name' : ''}">${esc(p.name)}</span></label></li>`).join('')}</ul>` : '<p style="color:var(--muted)">No players yet.</p>'}
+        <div class="btn-row"><button class="pill-btn red" data-act="reset-stats">Reset statistics</button><button class="pill-btn green" data-act="sheet-close">Done</button></div>` };
+    },
+    gameMenu() {
+      const m = activeMatch();
+      return { title: 'Match menu', body: `<div class="opt-list">
+        <button class="opt" data-act="game-log">Match log<small>See every turn and edit a past turn</small></button>
+        <button class="opt" data-act="match-settings">Settings for this match<small>Suggestions, early end turn, sound and input</small></button>
+        <button class="opt" data-act="restart-leg" ${m && m._rs.live ? '' : 'disabled'}>Restart leg<small>Clears every dart in the current leg</small></button>
+        <button class="opt" data-act="abandon">Abandon match<small>Ends the match without a winner. You can still resume it later.</small></button>
+        <button class="opt" data-act="leave-game">Leave for now<small>Saved. Resume from Home or All Games.</small></button></div>` };
+    },
+    matchSettings() {
+      const s = store.settings;
+      const row = (label, id, key) => `<div class="srow" style="padding-inline:0"><span class="grow">${label}</span>${switchHtml(id, s[key], 'set-' + key, label)}</div>`;
+      return { title: 'Settings for this match', body: row('Checkout suggestions', 'ms-sugg', 'suggestions') + row('Allow early end turn', 'ms-early', 'earlyEnd') +
+        row('Sound effects', 'ms-sound', 'sound') + row('Vibration', 'ms-vib', 'vibration') + row('Voice announcer', 'ms-voice', 'voice') +
+        (activeMatch() && activeMatch().mode === 'x01' ? `<div class="field"><span class="lbl">Score entry</span>${seg('ms-input', [['dart', 'Dart by dart'], ['total', 'Turn total']], s.inputMode)}</div>` : '') };
+    },
+    recap(s) {
+      const m = matchById(s.matchId), leg = m.legs[s.legIndex], rs = m._rs, S = m.settings;
+      const w = m.players.find((p) => p.id === leg.winnerId);
+      const matchOver = !!leg.wonMatch;
+      const title = matchOver ? 'Match won' : leg.wonSet ? 'Set won' : 'Leg won';
+      const wTurns = leg.turns.filter((t) => t.pid === w.id);
+      const wDarts = wTurns.reduce((a, t) => a + t.darts.length, 0);
+      let result, table;
+      if (m.mode === 'x01') {
+        const pts = wTurns.reduce((a, t) => a + t.score, 0);
+        const last = leg.turns[leg.turns.length - 1];
+        result = leg.resultType === 'checkout' ? `Checkout ${last.start} · ${wDarts} darts · ${fmt2(DL.safeDiv(pts, wDarts) * 3)} average` : `Won on low score with ${leg.finalScores[w.id]} left · ${wDarts} darts`;
+        const hr = isHouse(m);
+        table = `<div class="table-wrap"><table class="stat"><thead><tr><th>Player</th><th>Left</th>${hr ? '<th>Busts</th><th>Lock</th>' : '<th>Leg avg</th>'}</tr></thead><tbody>${m.players.map((p) => {
+          const ts = leg.turns.filter((t) => t.pid === p.id), d = ts.reduce((a, t) => a + t.darts.length, 0), sc = ts.reduce((a, t) => a + t.score, 0);
+          return `<tr><td>${nameHtml(p)}</td><td>${leg.finalScores[p.id]}</td>${hr ? `<td>${leg.bustCounts[p.id]}</td><td>${leg.lockerId === p.id ? `<span class="lock-tag" style="justify-content:center">${I.lock}${leg.lockedScore}</span>` : '-'}</td>` : `<td>${fmt2(DL.safeDiv(sc, d) * 3)}</td>`}</tr>`;
+        }).join('')}</tbody></table></div>`;
+      } else {
+        result = `Closed every number · ${wDarts} darts`;
+        table = `<div class="table-wrap"><table class="stat"><thead><tr><th>Player</th><th>Points</th><th>Leg MPR</th></tr></thead><tbody>${m.players.map((p) => {
+          const ts = leg.turns.filter((t) => t.pid === p.id), d = ts.reduce((a, t) => a + t.darts.length, 0), mk = ts.reduce((a, t) => a + t.marks, 0);
+          return `<tr><td>${nameHtml(p)}</td><td>${leg.finalScores[p.id]}</td><td>${fmt2(DL.safeDiv(mk, d) * 3)}</td></tr>`;
+        }).join('')}</tbody></table></div>`;
+      }
+      const score = `${S.sets > 1 ? 'Sets ' + m.players.map((p) => rs.setsWon[p.id]).join('-') + ' · ' : ''}Legs ${m.players.map((p) => (S.sets > 1 && !matchOver ? rs.legsWonSet[p.id] : rs.legsWonTotal[p.id])).join('-')}`;
+      return { title, noClose: true, body: `<div style="text-align:center;margin-bottom:12px">
+          <div style="font-size:30px;font-weight:800">${nameHtml(w)}</div><div style="color:var(--muted);font-weight:700;margin-top:4px">${esc(result)}</div>
+          <div style="margin-top:8px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><span class="chip">${esc(score)}</span>${isHouse(m) ? `<span class="chip amber">${HOUSE_NAME}</span>` : ''}</div></div>
+        ${table}
+        ${matchOver ? `<p class="saved-note">${I.check}Scores and stats saved on this device.${backupStale() ? ` <button class="link-btn" data-act="export">Save a backup file</button>` : ''}</p>` : ''}
+        <div class="btn-row"><button class="pill-btn" data-act="undo">${I.undo}Undo</button>
+        ${matchOver ? `<button class="pill-btn" data-act="recap-view">View match</button><button class="pill-btn green" data-act="recap-done">Done</button>` : `<button class="pill-btn green" data-act="sheet-close">Next leg</button>`}</div>` };
+    },
+    checkoutDarts(s) {
+      return { title: `Checkout ${s.v}`, body: `<p>How many darts did the checkout take?</p><div class="opt-grid">${s.opts.map((n) => optBtn('co-darts', n, n + (n === 1 ? ' dart' : ' darts'), false)).join('')}</div>` };
+    },
+    edit() {
+      const e = ui.edit, m = matchById(e.matchId), leg = m.legs[e.li], t = leg.turns[e.ti];
+      const p = m.players.find((x) => x.id === t.pid);
+      let body = `<p style="margin-top:0;color:var(--muted)">${S_LEG(m, leg)} · ${m.mode === 'x01' ? `Started on ${t.start}` : 'Cricket turn'}. Undo darts with Clear, then enter them again.</p>`;
+      if (e.mode === 'total') {
+        body += totalPad('edit', e.buf, false) + `<div class="field"><span class="lbl">Darts used</span>${seg('edit-tdarts', [[1, '1'], [2, '2'], [3, '3']], e.totalDarts || 3, 'small')}</div>`;
+      } else {
+        const ended = editTurnEnds(m, t, e.darts);
+        body += `<div class="boxes" style="justify-content:center;margin-bottom:8px">${[0, 1, 2].map((k) => `<span class="dbox">${e.darts[k] ? esc(DL.dartLabel(e.darts[k])) : ''}</span>`).join('')}</div>`;
+        body += dartPad('edit', m, e.mult, e.darts.length >= 3 || ended);
+        if (ended) body += '<p class="hint">This dart ends the turn (bust or checkout).</p>';
+      }
+      body += `<div class="btn-row"><button class="pill-btn" data-act="edit-clear">Clear</button><button class="pill-btn" data-act="sheet-close">Cancel</button><button class="pill-btn green" data-act="edit-save">Save</button></div>`;
+      return { title: `Edit turn: ${p.name}`, body };
+    },
+    text(s) {
+      return { title: s.title, body: `${s.note ? `<p style="color:var(--muted)">${esc(s.note)}</p>` : ''}<textarea class="input" id="text-out" readonly aria-label="${esc(s.title)}">${esc(s.text)}</textarea>
+        <div class="btn-row"><button class="pill-btn green" data-act="copy-text">Copy</button></div>` };
+    },
+    importData() {
+      return { title: 'Import from JSON', body: `<p style="color:var(--muted)">Choose an exported file or paste its contents. Importing replaces the players, matches and settings on this device.</p>
+        <div class="field"><label for="import-file">File</label><input class="input" type="file" id="import-file" accept="application/json,.json" data-change="import-file" style="padding-top:10px"></div>
+        <div class="field"><label for="import-text">Or paste JSON</label><textarea class="input" id="import-text" placeholder="{ ... }"></textarea></div>
+        <div class="btn-row"><button class="pill-btn green" data-act="import-run">Import</button></div>` };
+    },
+    selfTest() {
+      const r = ui.sheet.results;
+      const passed = r.filter((x) => x.pass).length;
+      return { title: 'Self-tests', body: `<p><b>${passed} of ${r.length} passed.</b> ${passed === r.length ? 'Everything checks out.' : 'Some checks failed; details are below.'}</p>
+        ${r.map((x) => `<div class="test-row"><b class="${x.pass ? 'ok' : 'bad'}">${x.pass ? 'PASS' : 'FAIL'}</b><span>${esc(x.name)}${x.detail ? `<small>${esc(x.detail)}</small>` : ''}</span></div>`).join('')}` };
+    },
+  };
+  SHEETS.playerEdit = SHEETS.playerForm;
+  SHEETS.playerNew = SHEETS.playerForm;
+  function S_LEG(m, leg) { return `${m.settings.sets > 1 ? `Set ${leg.setNo}, ` : ''}Leg ${leg.legNo}`; }
+  function countSheet(title, key) {
+    const c = homeCfg();
+    const opts = Array.from({ length: 21 }, (_, i) => i + 1);
+    return { title, body: `<div class="opt-grid cols7">${opts.map((n) => optBtn('set-count', n, n, c[key] === n, '', c.format === 'bestOf' && n % 2 === 0)).join('')}</div>
+      ${c.format === 'bestOf' ? '<p class="hint">Best of uses odd numbers only.</p>' : ''}` };
+  }
+  function nextBotName() {
+    const names = new Set(store.players.map((p) => p.name));
+    let n = 1; while (names.has('DartBot ' + n)) n++;
+    return 'DartBot ' + n;
+  }
+
+  /* ---------- share / export / import ---------- */
+  function lastMatchSummary() {
+    const m = store.matches.slice().sort((a, b) => (b.endedAt || b.updatedAt) - (a.endedAt || a.updatedAt))[0];
+    if (!m) return null;
+    const lines = [`Dart Scoreboard: ${settingsSummary(m)}${isHouse(m) ? ' (' + HOUSE_NAME + ')' : ''}`];
+    const w = m.players.find((p) => p.id === m.winnerId);
+    lines.push(w ? `${w.name} won ${scoreLine(m)}.` : `In progress, ${scoreLine(m)}.`);
+    const tot = DL.matchPlayerTotals(m, m._rs);
+    lines.push(m.players.map((p) => `${p.name}: ${m.mode === 'x01' ? 'avg ' + fmt2(DL.safeDiv(tot[p.id].points, tot[p.id].darts) * 3) : 'MPR ' + fmt2(DL.safeDiv(tot[p.id].marks, tot[p.id].darts) * 3)}`).join(', '));
+    return lines.join('\n');
+  }
+  async function share() {
+    const text = lastMatchSummary();
+    if (!text) { toast('Play a match first, then share the result.'); return; }
+    let copied = false;
+    try { await navigator.clipboard.writeText(text); copied = true; } catch (e) { copied = false; }
+    try { if (navigator.share) { await navigator.share({ title: 'Dart Scoreboard', text }); return; } } catch (e) { /* share refused or cancelled */ }
+    if (copied) toast('Match summary copied');
+    else openSheet({ type: 'text', title: 'Share the last match', text, note: 'Copy this summary.' });
+  }
+  function exportData() {
+    const data = { app: 'Dart Scoreboard', version: DL.APP_VERSION, exportedAt: new Date().toISOString(),
+      players: store.players, home: store.home, settings: store.settings,
+      matches: store.matches.map((m) => Object.assign(serializeMatch(m), { legs: m.legs.map((l) => ({ e: l.events.map(DL.encodeEvent), turns: l.turns, winnerId: l.winnerId, resultType: l.resultType, lockerId: l.lockerId, lockedScore: l.lockedScore, finalRoundOrder: l.finalRoundOrder, finalScores: l.finalScores, bustCounts: l.bustCounts })) })) };
+    const text = JSON.stringify(data, null, 1);
+    const filename = `dart-scoreboard-${new Date().toISOString().slice(0, 10)}.json`;
+    const fallback = (note) => openSheet({ type: 'text', title: 'Export all data', text, note });
+    if (downloadsNs) {
+      downloadsNs.save({ filename, data: text }).then(() => { markBackup(); toast('Backup saved'); render(); renderSheet(); }, (err) => {
+        const code = err && err.code;
+        if (code === 'declined') toast('Export cancelled');
+        else if (code === 'rate_limited') toast('A save prompt is already open');
+        else fallback('Saving a file is not available here. Copy this JSON and keep it somewhere safe.');
+      });
+      return;
+    }
+    try {
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      markBackup();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch (e) { /* downloads blocked */ }
+    fallback('If no file was saved, copy this JSON and keep it somewhere safe.');
+  }
+  function importText(text) {
+    let data;
+    try { data = JSON.parse(text); } catch (e) { toast('That is not valid JSON', 'red'); return; }
+    if (!data || !Array.isArray(data.players) || !Array.isArray(data.matches)) { toast('This file is not a Dart Scoreboard export', 'red'); return; }
+    confirmBox({ title: 'Replace all data?', message: `Import ${data.players.length} players and ${data.matches.length} matches. Current data on this device is replaced.`, confirm: 'Import', danger: true,
+      onConfirm: () => {
+        const keep = { statsFilter: store.statsFilter, gamesFilter: store.gamesFilter };
+        const next = mergeStore(Object.assign({}, data, keep, { activeMatchId: null }));
+        next.matches.forEach((m) => { try { hydrateMatch(m); } catch (e) { m._broken = true; } });
+        next.matches = next.matches.filter((m) => !m._broken);
+        store = next; save(); applyTheme(); ui.sheet = null; renderSheet(); go('home'); toast('Data imported');
+      } });
+  }
+
+  function applyTheme() {
+    const t = store.settings.theme;
+    if (t === 'system') document.documentElement.removeAttribute('data-app-theme');
+    else document.documentElement.setAttribute('data-app-theme', t);
+  }
+
+  /* ======================================================================
+     EVENTS
+     ====================================================================== */
+  const ACT = {
+    tab: (el) => go(el.dataset.tab),
+    'home-mode': (el) => { store.home.mode = el.dataset.v; save(); render(); },
+    pick: (el) => openSheet({ type: el.dataset.pick }),
+    'set-points': (el) => { store.home.x01.points = +el.dataset.v; save(); closeSheet(); },
+    'set-points-custom': () => {
+      const v = parseInt($('#custom-points').value, 10);
+      if (!(v >= 2 && v <= 9999)) { toast('Choose a number from 2 to 9999', 'red'); return; }
+      store.home.x01.points = v; save(); closeSheet();
+    },
+    'set-checkOut': (el) => { store.home.x01.checkOut = el.dataset.v; save(); closeSheet(); },
+    'set-checkIn': (el) => { store.home.x01.checkIn = el.dataset.v; save(); closeSheet(); },
+    'set-count': (el) => { homeCfg()[ui.sheet.type] = +el.dataset.v; save(); closeSheet(); },
+    'set-format': (el) => {
+      const c = homeCfg(); c.format = el.dataset.v;
+      if (c.format === 'bestOf') {
+        const bumped = [];
+        ['sets', 'legs'].forEach((k) => { if (c[k] % 2 === 0) { c[k] = Math.min(21, c[k] + 1); bumped.push(`${k === 'sets' ? 'Sets' : 'Legs'} set to ${c[k]}`); } });
+        if (bumped.length) toast('Best of needs odd numbers. ' + bumped.join(', ') + '.');
+      }
+      save(); closeSheet();
+    },
+    'hr-allow': (el) => { const hr = store.home.x01.houseRule; hr.bustAllowance = Math.max(1, Math.min(3, hr.bustAllowance + +el.dataset.v)); save(); renderSheet(); render(); },
+    'set-scoring': (el) => { store.home.cricket.scoring = el.dataset.v; save(); closeSheet(); },
+    'set-numbers': (el) => { store.home.cricket.numbers = el.dataset.v; save(); closeSheet(); },
+    start: () => startMatch(),
+    resume: (el) => {
+      const m = matchById(el.dataset.id); if (!m) return;
+      if (m.status === 'abandoned') { m.status = 'active'; m.endedAt = null; }
+      store.activeMatchId = m.id; save(); openGame();
+    },
+    share: () => share(),
+    'add-players': () => openSheet({ type: 'addPlayers' }),
+    'add-bot': () => openSheet({ type: 'addBot', skill: 3 }),
+    'bot-skill': (el) => { ui.sheet.skill = +el.dataset.v; renderSheet(); },
+    'bot-pick': (el) => { store.home.roster.push(el.dataset.id); save(); closeSheet(); },
+    'bot-create': () => {
+      const p = { id: uid(), name: nextBotName(), isBot: true, skill: ui.sheet.skill || 3, label: '', createdAt: Date.now() };
+      store.players.push(p); store.home.roster.push(p.id); save(); closeSheet(); toast(`${p.name} added`);
+    },
+    'roster-remove': (el) => { store.home.roster = store.home.roster.filter((id) => id !== el.dataset.id); save(); render(); },
+    'player-new': () => openSheet({ type: 'playerNew' }),
+    'player-edit': (el) => openSheet({ type: 'playerEdit', id: el.dataset.id }),
+    'pf-type': (el) => { captureForm(); ui.sheet.isBot = el.dataset.v === 'bot'; renderSheet(); },
+    'pf-skill': (el) => { captureForm(); ui.sheet.skill = +el.dataset.v; renderSheet(); },
+    'player-delete': (el) => {
+      const p = playerById(el.dataset.id);
+      confirmBox({ title: `Delete ${p.name}?`, message: 'Past matches stay in All Games. Choose whether their numbers stay in Statistics.',
+        buttons: [
+          { label: 'Cancel' },
+          { label: 'Delete, keep stats', style: 'red', run: () => deletePlayer(p.id, false) },
+          { label: 'Delete and hide stats', style: 'red', run: () => deletePlayer(p.id, true) },
+        ] });
+    },
+    'stats-mode': (el) => { store.statsFilter.mode = el.dataset.v; save(); render(); },
+    'stats-range': (el) => { store.statsFilter.range = el.dataset.v; save(); render(); },
+    'stats-filter': () => openSheet({ type: 'statsFilter' }),
+    info: () => { ui.infoOpen = !ui.infoOpen; render(); },
+    'reset-stats': () => confirmBox({ title: 'Reset statistics?', message: 'This deletes every finished and abandoned match, which clears all statistics and the match history. Players and any match in progress are kept.', confirm: 'Reset', danger: true,
+      onConfirm: () => { store.matches = store.matches.filter((m) => m.status === 'active'); save(); ui.sheet = null; renderSheet(); render(); toast('Statistics reset'); } }),
+    'games-mode': (el) => { store.gamesFilter.mode = el.dataset.v; save(); render(); },
+    'open-match': (el) => openDetail(el.dataset.id, 'games'),
+    'delete-match': (el) => {
+      const id = el.dataset.id;
+      confirmBox({ title: 'Delete this match?', message: 'It is removed from All Games and Statistics. This cannot be undone.', confirm: 'Delete', danger: true,
+        onConfirm: () => {
+          store.matches = store.matches.filter((m) => m.id !== id);
+          if (store.activeMatchId === id) store.activeMatchId = null;
+          save(); if (ui.screen === 'match') { ui.screen = null; ui.tab = 'games'; saveUi(); } render(); toast('Match deleted');
+        } });
+    },
+    'detail-back': () => { if (ui.detailFrom === 'game' && activeMatch()) openGame(); else go('games'); },
+    'edit-turn': (el) => openEditTurn(matchById(ui.detailId), +el.dataset.li, +el.dataset.ti),
+    'edit-clear': () => { ui.edit.darts = []; ui.edit.buf = ''; renderSheet(); },
+    'edit-save': () => saveEdit(false),
+    'edit-tdarts': (el) => { ui.edit.totalDarts = +el.dataset.v; renderSheet(); },
+    theme: (el) => { store.settings.theme = el.dataset.v; save(); applyTheme(); render(); },
+    export: () => exportData(),
+    import: () => openSheet({ type: 'importData' }),
+    'import-run': () => { const t = $('#import-text').value.trim(); if (!t) { toast('Choose a file or paste JSON first', 'red'); return; } importText(t); },
+    'reset-all': () => confirmBox({ title: 'Reset all data?', message: 'Deletes every player, match and statistic and restores default settings on this device.', confirm: 'Reset everything', danger: true,
+      onConfirm: () => { clearReview(); store = defaultStore(); save(); applyTheme(); go('home'); toast('All data reset'); } }),
+    'self-test': () => { const results = DL.runSelfTests().concat(uiSelfTests()); openSheet({ type: 'selfTest', results }); },
+    'copy-text': () => {
+      const ta = $('#text-out');
+      const done = () => { toast('Copied'); if (ui.sheet && ui.sheet.title === 'Export all data') markBackup(); };
+      try { navigator.clipboard.writeText(ta.value).then(done, () => { ta.select(); toast('Press copy on your keyboard or menu'); }); }
+      catch (e) { ta.select(); toast('Press copy on your keyboard or menu'); }
+    },
+    'sheet-close': () => closeSheet(),
+    'sheet-bg': (el, e) => { if (e.target === el && !(ui.sheet && ui.sheet.type === 'recap')) closeSheet(); },
+    'dialog-bg': (el, e) => { if (e.target === el) closeDialog(); },
+    'dialog-btn': (el) => { const b = ui.dialog._buttons[+el.dataset.i]; closeDialog(); if (b && b.run) b.run(); },
+    // game
+    'game-bg': () => {
+      const m = activeMatch();
+      if (m && m._rs.live && m.players[m._rs.live.seat].isBot && !ui.botFast) { ui.botFast = true; scheduleBot(); }
+    },
+    'bot-fast': () => { ui.botFast = true; scheduleBot(); },
+    mult: (el) => {
+      const v = +el.dataset.v;
+      if (el.dataset.target === 'edit') { ui.edit.mult = ui.edit.mult === v ? 1 : v; renderSheet(); }
+      else { ui.pad.mult = ui.pad.mult === v ? 1 : v; render(); }
+    },
+    dart: (el) => {
+      const raw = el.dataset.s;
+      const target = el.dataset.target;
+      const mult = target === 'edit' ? ui.edit.mult : ui.pad.mult;
+      let d;
+      if (raw === 'bull') d = { s: 25, m: 2 };
+      else if (raw === '25') d = { s: 25, m: 1 };
+      else if (+raw === 0) d = { s: 0, m: 0 };
+      else d = { s: +raw, m: mult };
+      if (target === 'edit') {
+        if (ui.edit.darts.length >= 3) return;
+        ui.edit.darts.push(d); ui.edit.mult = 1; renderSheet(); return;
+      }
+      ui.pad.mult = 1;
+      applyEvent({ t: 'd', s: d.s, m: d.m });
+    },
+    'input-mode': (el) => {
+      if (el.dataset.target === 'edit') { ui.edit.mode = el.dataset.v; ui.edit.darts = []; ui.edit.buf = ''; renderSheet(); return; }
+      store.settings.inputMode = el.dataset.v; ui.pad.buf = ''; save(); render();
+    },
+    tkey: (el) => {
+      const edit = el.dataset.target === 'edit';
+      const o = edit ? ui.edit : ui.pad;
+      const v = el.dataset.v;
+      if (v === 'del') o.buf = o.buf.slice(0, -1);
+      else if (v === 'ok') { if (edit) { saveEdit(false); return; } submitTotal(); return; }
+      else if (o.buf.length < 3) o.buf = (o.buf + v).replace(/^0+(?=\d)/, '');
+      if (edit) renderSheet(); else render();
+    },
+    'co-darts': (el) => { const s = ui.sheet; ui.sheet = null; renderSheet(); applyEvent({ t: 'tot', v: s.v, n: +el.dataset.v }); },
+    undo: () => doUndo(),
+    'end-turn': () => applyEvent({ t: 'end' }),
+    'lock-in': () => {
+      const m = activeMatch(); const live = m._rs.live; const p = m.players[live.seat];
+      confirmBox({ title: `Lock in ${live.rem[live.seat]}?`, message: `Everyone else gets one more turn to beat it.${live.current.darts.length ? ' Darts already thrown this turn stay counted.' : ''}`, confirm: 'Lock In', amber: true,
+        onConfirm: () => applyEvent({ t: 'lock' }) });
+      void p;
+    },
+    'game-menu': () => openSheet({ type: 'gameMenu' }),
+    'game-log': () => { ui.sheet = null; renderSheet(); openDetail(store.activeMatchId, 'game'); },
+    'match-settings': () => openSheet({ type: 'matchSettings' }),
+    'ms-input': (el) => { store.settings.inputMode = el.dataset.v; save(); renderSheet(); },
+    'restart-leg': () => confirmBox({ title: 'Restart this leg?', message: 'Every dart in the current leg is cleared. Earlier legs stay.', confirm: 'Restart leg', danger: true,
+      onConfirm: () => { const m = activeMatch(); clearReview(); m.legs[m.legs.length - 1].events = []; refresh(m); save(); ui.sheet = null; renderSheet(); render(); } }),
+    abandon: () => confirmBox({ title: 'Abandon this match?', message: 'It ends without a winner and does not count in Statistics. You can resume it later from All Games.', confirm: 'Abandon', danger: true,
+      onConfirm: () => { const m = activeMatch(); clearReview(); m.status = 'abandoned'; m.endedAt = Date.now(); store.activeMatchId = null; save(); ui.sheet = null; renderSheet(); go('home'); } }),
+    'leave-game': () => {
+      const m = activeMatch();
+      const leave = () => { clearReview(); ui.sheet = null; renderSheet(); go('home'); };
+      if (m && m.status === 'active') confirmBox({ title: 'Leave the match?', message: 'Progress is saved. Resume it from Home or All Games.', confirm: 'Leave', onConfirm: leave });
+      else leave();
+    },
+    'open-recap': () => { const m = activeMatch(); openSheet({ type: 'recap', matchId: m.id, legIndex: m.legs.length - 1 }); },
+    'recap-view': () => { const m = activeMatch(); ui.sheet = null; renderSheet(); store.activeMatchId = null; save(); openDetail(m.id, 'games'); },
+    'recap-done': () => { ui.sheet.done = true; closeSheet(); },
+  };
+  function captureForm() {
+    const n = $('#pf-name'), l = $('#pf-label');
+    if (n) ui.sheet.name = n.value;
+    if (l) ui.sheet.label = l.value;
+  }
+  function deletePlayer(id, hideStats) {
+    store.players = store.players.filter((p) => p.id !== id);
+    store.home.roster = store.home.roster.filter((x) => x !== id);
+    if (hideStats && !store.statsFilter.hidden.includes(id)) store.statsFilter.hidden.push(id);
+    save(); ui.sheet = null; renderSheet(); render(); toast('Player deleted');
+  }
+
+  const CHANGE = {
+    'random-order': (el) => { store.home.randomOrder = el.checked; save(); render(); },
+    'roster-toggle': (el) => {
+      const id = el.dataset.id;
+      if (el.checked) { if (!store.home.roster.includes(id)) store.home.roster.push(id); }
+      else store.home.roster = store.home.roster.filter((x) => x !== id);
+      save(); render();
+    },
+    'hr-toggle': (el) => { store.home.x01.houseRule.oneBustLowScore = el.checked; save(); render(); },
+    'stats-player': (el) => {
+      const id = el.dataset.id, h = new Set(store.statsFilter.hidden);
+      if (el.checked) h.delete(id); else h.add(id);
+      store.statsFilter.hidden = [...h]; save(); render();
+    },
+    'games-player': (el) => { store.gamesFilter.player = el.value; save(); render(); },
+    'import-file': (el) => {
+      const f = el.files && el.files[0]; if (!f) return;
+      const r = new FileReader();
+      r.onload = () => { $('#import-text').value = String(r.result || ''); };
+      r.readAsText(f);
+    },
+  };
+  ['earlyEnd', 'suggestions', 'wakeLock', 'sound', 'vibration', 'voice'].forEach((k) => {
+    CHANGE['set-' + k] = (el) => {
+      store.settings[k] = el.checked; save();
+      if (k === 'wakeLock') updateWakeLock();
+      if (k === 'voice' && el.checked) speak('Voice on');
+      render();
+    };
+  });
+
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-act]');
+    if (!el || el.disabled) return;
+    const fn = ACT[el.dataset.act];
+    if (!fn) return;
+    if (el.dataset.act === 'game-bg' && e.target.closest('button, input, select, a, label')) return;
+    fn(el, e);
+  });
+  document.addEventListener('change', (e) => {
+    const el = e.target.closest('[data-change]');
+    if (el && CHANGE[el.dataset.change]) CHANGE[el.dataset.change](el, e);
+  });
+  document.addEventListener('submit', (e) => {
+    const f = e.target.closest('[data-form]');
+    if (!f) return;
+    e.preventDefault();
+    if (f.dataset.form === 'new-player') {
+      const input = $('#np-name'), name = input.value.trim();
+      if (!name) { toast('Type a name first', 'red'); input.focus(); return; }
+      const p = { id: uid(), name, isBot: false, skill: null, label: '', createdAt: Date.now() };
+      store.players.push(p); store.home.roster.push(p.id); save(); renderSheet(); render();
+      const again = $('#np-name'); again && again.focus();
+      toast(`${name} added`);
+    } else if (f.dataset.form === 'player') {
+      captureForm();
+      const s = ui.sheet;
+      const existing = s.id ? playerById(s.id) : null;
+      const isBot = s.isBot !== undefined ? s.isBot : existing ? existing.isBot : false;
+      const name = (s.name || '').trim() || (isBot ? nextBotName() : '');
+      if (!name) { toast('Type a name first', 'red'); return; }
+      const skill = isBot ? s.skill || (existing && existing.skill) || 3 : null;
+      if (existing) Object.assign(existing, { name, isBot, skill, label: (s.label || '').trim() });
+      else store.players.push({ id: uid(), name, isBot, skill, label: (s.label || '').trim(), createdAt: Date.now() });
+      save(); closeSheet(); toast(existing ? 'Player saved' : `${name} added`);
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (ui.dialog) { closeDialog(); return; }
+      if (ui.sheet && ui.sheet.type !== 'recap') { closeSheet(); return; }
+    }
+    const h = e.target.closest && e.target.closest('[data-drag]');
+    if (h && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault();
+      const i = +h.dataset.idx, j = i + (e.key === 'ArrowUp' ? -1 : 1);
+      if (moveItem(h.dataset.drag, i, j)) {
+        const nh = document.querySelector(`[data-drag="${h.dataset.drag}"][data-idx="${j}"]`);
+        nh && nh.focus();
+      }
+    }
+    // Keyboard entry during a game: digits type a total in total mode.
+    if (ui.screen === 'game' && !ui.sheet && !ui.dialog && store.settings.inputMode === 'total' && !e.target.closest('input, textarea, button')) {
+      const k = /^[0-9]$/.test(e.key) ? e.key : e.key === 'Backspace' ? 'del' : e.key === 'Enter' ? 'ok' : null;
+      if (k) { e.preventDefault(); ACT.tkey({ dataset: { v: k, target: 'game' } }); }
+    }
+  });
+
+  /* ---------- drag to reorder ---------- */
+  function moveItem(list, i, j) {
+    const arr = list === 'roster' ? store.home.roster : store.players;
+    const ids = list === 'roster' ? arr.filter((id) => playerById(id)) : arr;
+    if (j < 0 || j >= ids.length || i === j) return false;
+    const [x] = ids.splice(i, 1);
+    ids.splice(j, 0, x);
+    if (list === 'roster') store.home.roster = ids;
+    save(); render();
+    return true;
+  }
+  let drag = null;
+  document.addEventListener('pointerdown', (e) => {
+    const h = e.target.closest('[data-drag]');
+    if (!h || e.button > 0) return;
+    const row = h.closest('.row'), listEl = row.parentElement;
+    const rows = [...listEl.children];
+    drag = { list: h.dataset.drag, from: +h.dataset.idx, to: +h.dataset.idx, row, rows, startY: e.clientY,
+      mids: rows.map((r) => { const b = r.getBoundingClientRect(); return b.top + b.height / 2; }), h: row.getBoundingClientRect().height + 8, id: e.pointerId };
+    try { h.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    row.classList.add('dragging');
+    rows.forEach((r) => r !== row && r.classList.add('shift'));
+    e.preventDefault();
+  });
+  document.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dy = e.clientY - drag.startY;
+    drag.row.style.transform = `translateY(${dy}px)`;
+    const center = drag.mids[drag.from] + dy;
+    let to = 0;
+    drag.mids.forEach((m, k) => { if (k !== drag.from && center > m) to++; });
+    drag.to = to;
+    drag.rows.forEach((r, k) => {
+      if (r === drag.row) return;
+      let shift = 0;
+      if (drag.from < to && k > drag.from && k <= to) shift = -drag.h;
+      if (drag.from > to && k >= to && k < drag.from) shift = drag.h;
+      r.style.transform = shift ? `translateY(${shift}px)` : '';
+    });
+  });
+  const endDrag = (e) => {
+    if (!drag || (e && e.pointerId !== drag.id)) return;
+    const d = drag; drag = null;
+    d.rows.forEach((r) => { r.style.transform = ''; r.classList.remove('dragging', 'shift'); });
+    if (d.to !== d.from) moveItem(d.list, d.from, d.to);
+  };
+  document.addEventListener('pointerup', endDrag);
+  document.addEventListener('pointercancel', endDrag);
+
+  /* ---------- UI-level self-tests ---------- */
+  function uiSelfTests() {
+    const out = [];
+    const t = (name, fn) => { try { const r = fn(); out.push({ name, pass: r === true, detail: r === true ? '' : String(r) }); } catch (e) { out.push({ name, pass: false, detail: e.message }); } };
+    t('UI: Lock In button hidden in Cricket and during final turns', () => {
+      const P = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }];
+      const mk = (mode, S, evs) => { const m = { id: 'tmp', mode, settings: S, players: P, legs: [{ events: evs }] }; refresh(m, true); return m; };
+      const X = { points: 301, checkIn: 'straight', checkOut: 'double', format: 'firstTo', sets: 1, legs: 1, houseRule: { oneBustLowScore: true, bustAllowance: 1 } };
+      const has = (m) => /data-act="lock-in"/.test(inputPanel(m, m._rs, null, false));
+      const normal = mk('x01', X, []);
+      const final = mk('x01', X, [{ t: 'd', s: 20, m: 3 }, { t: 'lock' }]);
+      const cricket = mk('cricket', { scoring: 'standard', numbers: DL.CRICKET_DEFAULT, format: 'firstTo', sets: 1, legs: 1, houseRule: X.houseRule }, []);
+      return (has(normal) && !has(final) && !has(cricket)) || 'visible in the wrong place';
+    });
+    t('UI: stats render without NaN on empty data', () => {
+      const saved = store.matches; store.matches = [];
+      const a = renderStats(); store.matches = saved;
+      return (!/NaN/.test(a) && /No data yet/.test(a)) || 'NaN found';
+    });
+    t('UI: saved data round-trips through serialisation', () => {
+      const s = JSON.parse(serializeStore());
+      return (Array.isArray(s.matches) && s.matches.every((m) => m.legs.every((l) => Array.isArray(l.e)))) || 'bad shape';
+    });
+    return out;
+  }
+
+  /* ---------- boot ---------- */
+  function boot(data) {
+    loadStore(data && data.store);
+    try { const u = JSON.parse(ssGet(UI_KEY) || 'null'); if (u) Object.assign(ui, { tab: u.tab || 'home', screen: u.screen || null, detailId: u.detailId || null, detailFrom: u.detailFrom || null }); } catch (e) { /* ignore */ }
+    if (data && data.ui) Object.assign(ui, data.ui);
+    // Resume the active match on refresh.
+    const am = activeMatch();
+    if (am && am.status === 'active' && ui.screen !== 'match') ui.screen = 'game';
+    applyTheme();
+    render();
+    updateWakeLock();
+    ensurePersist().then(() => { if (ui.tab === 'settings' && !ui.screen) render(); });
+    const r = DL.runSelfTests();
+    const failed = r.filter((x) => !x.pass);
+    try { console.info(`Dart Scoreboard self-tests: ${r.length - failed.length}/${r.length} passed`); failed.forEach((f) => console.warn('FAIL', f.name, f.detail)); } catch (e) { /* ignore */ }
+    window.__dartApp = { store: () => store, ui, runSelfTests: () => DL.runSelfTests().concat(uiSelfTests()) };
+  }
+  // File saves go through the viewer's downloads capability when it is available.
+  let downloadsNs = null;
+  try {
+    if (window.claude && typeof window.claude.use === 'function') {
+      window.claude.use('downloads').then((ns) => { downloadsNs = ns || null; }, () => { downloadsNs = null; });
+    }
+  } catch (e) { downloadsNs = null; }
+  const hot = window.claude && window.claude.hot;
+  if (hot && hot.snapshot) { try { hot.snapshot(() => ({ store: serializeStore(), ui: { tab: ui.tab, screen: ui.screen, detailId: ui.detailId, detailFrom: ui.detailFrom } })); } catch (e) { /* ignore */ } }
+  if (hot && hot.ready) hot.ready(boot); else boot((hot && hot.data) || {});
+  // Offline support when installed from GitHub Pages.
+  try {
+    if ('serviceWorker' in navigator && /\.github\.io$/.test(location.hostname)) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
+  } catch (e) { /* ignore */ }
+})();
+
+</script>
+</body>
+</html>
