@@ -2,7 +2,8 @@
 
 ## What this is
 A single-page darts scoreboard (X01 and Cricket) that installs to a phone home screen.
-No server and no database: everything is saved in the visitor's browser (localStorage).
+Everything is saved in the visitor's browser (localStorage). Each finished match is also
+uploaded to the owner's Google Sheet through a Google Apps Script web app.
 
 ## Where it lives
 - **Live site:** https://andrewmswensen-hue.github.io/dart-scoreboard/
@@ -22,6 +23,17 @@ usually within a minute.
 - `manifest.webmanifest`, `icon-*.png`, `sw.js`: home screen install and offline support.
 - `tools/build.py`: builds `index.html` from `src/`.
 - `tools/make-icons.js`: renders the PNG icons from `src/icon.svg` (needs Playwright).
+- `apps-script/Code.gs`, `apps-script/SETUP.md`: the Google Sheet upload endpoint and how to deploy it.
+
+## Result uploads
+- `UPLOAD_URL` near the top of the upload section in `src/ui.js` holds the Apps Script web app URL.
+  Empty means uploads are off.
+- Every finished match is queued in `store.uploads` and sent as a text/plain POST (no CORS
+  preflight). Offline uploads stay queued and retry on launch, on `online`, and when the app
+  comes back to the foreground. An edited finished match is re-uploaded; the script replaces its rows.
+- Players can opt out in Settings ("Share finished games"). Uploads never run in the Claude artifact.
+- The sheet has two tabs: **Matches** and **Player results**. Player text is escaped so it
+  cannot run as a formula.
 
 ## To change the app
 1. Edit files in `src/`.

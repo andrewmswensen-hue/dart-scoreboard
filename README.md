@@ -13,9 +13,11 @@ A phone-first darts scoreboard that runs in the browser and installs to your hom
 
 ## Install on a phone
 
-- **iPhone (Safari):** open the link, tap Share, then **Add to Home Screen**.
+- **iPhone (Chrome or Safari):** open the link, tap the **Share** icon, then **Add to Home Screen**. Always open it from the icon: the installed app keeps its own storage, separate from browser tabs.
 - **Android (Chrome):** open the link, tap the menu, then **Install app** or **Add to Home screen**.
 
 ## Your data
 
-Players, matches and statistics are saved in the browser on that device after every dart. Nothing is sent anywhere. Use **Settings > Export all data** now and then to keep a backup file, and **Import** to move data to another phone.
+Players, matches and statistics are saved on the device after every dart. When a match finishes, its players, scores and statistics are also uploaded to the app owner's Google Sheet (players can turn this off in **Settings > Share finished games**). If there is no signal, the upload waits and is sent the next time the app is online.
+
+Use **Settings > Export all data** now and then to keep a backup file, and **Import** to move data to another phone.

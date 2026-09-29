@@ -1554,10 +1554,10 @@ if (typeof module !== 'undefined') module.exports = DL;
         x01: { points: 501, checkOut: 'straight', checkIn: 'straight', format: 'firstTo', sets: 3, legs: 1, houseRule: { oneBustLowScore: false, bustAllowance: 1 } },
         cricket: { scoring: 'standard', numbers: 'standard', format: 'firstTo', sets: 3, legs: 1 },
       },
-      settings: { sound: true, vibration: true, earlyEnd: true, suggestions: true, wakeLock: false, theme: 'system', voice: false, inputMode: 'dart' },
+      settings: { shareResults: true, sound: true, vibration: true, earlyEnd: true, suggestions: true, wakeLock: false, theme: 'system', voice: false, inputMode: 'dart' },
       statsFilter: { mode: 'x01', range: 'all', hidden: [] },
       gamesFilter: { mode: 'all', player: '' },
-      lastBackupAt: null,
+      lastBackupAt: null, deviceId: uid(), uploads: {},
     };
   }
   function mergeStore(data) {
@@ -1579,6 +1579,8 @@ if (typeof module !== 'undefined') module.exports = DL;
     out.statsFilter = Object.assign(d.statsFilter, data.statsFilter || {});
     out.gamesFilter = Object.assign(d.gamesFilter, data.gamesFilter || {});
     out.lastBackupAt = data.lastBackupAt || null;
+    out.deviceId = data.deviceId || d.deviceId;
+    out.uploads = data.uploads && typeof data.uploads === 'object' ? data.uploads : {};
     return out;
   }
   function hydrateMatch(m) {
@@ -1680,6 +1682,66 @@ if (typeof module !== 'undefined') module.exports = DL;
   }
   const backupStale = () => !store.lastBackupAt || Date.now() - store.lastBackupAt > 7 * 86400000;
   function markBackup() { store.lastBackupAt = Date.now(); save(); }
+
+  /* ---------- cloud upload of finished matches (Google Sheet) ---------- */
+  // Google Apps Script web app URL from the owner's Sheet (see apps-script/SETUP.md).
+  const UPLOAD_URL = '';
+  const IN_ARTIFACT = !!window.claude || /claude/.test(location.hostname);
+  const uploadConfigured = () => !!UPLOAD_URL && !IN_ARTIFACT;
+  const uploadOn = () => uploadConfigured() && store.settings.shareResults !== false;
+  const pendingUploads = () => Object.keys(store.uploads || {}).filter((id) => store.uploads[id].pending).length;
+  function uploadPayload(m) {
+    const order = m.players.map((p) => p.id);
+    const f = { range: 'all', includeUnfinished: true, order };
+    const rows = m.mode === 'x01' ? DL.statsX01([m], f).rows : DL.statsCricket([m], f).rows;
+    const rs = m._rs, winner = m.players.find((p) => p.id === m.winnerId);
+    return {
+      v: 1, app: DL.APP_VERSION, deviceId: store.deviceId,
+      match: {
+        id: m.id, mode: m.mode, createdAt: m.createdAt, endedAt: m.endedAt, settings: m.settings,
+        summary: settingsSummary(m), houseRule: isHouse(m), score: scoreLine(m),
+        players: m.players, winnerId: m.winnerId, winnerName: winner ? winner.name : '',
+        legs: m.legs.map((l) => ({ e: l.events.map(DL.encodeEvent), winnerId: l.winnerId, resultType: l.resultType, lockerId: l.lockerId || null, lockedScore: l.lockedScore == null ? null : l.lockedScore })),
+      },
+      results: rows.map((r) => {
+        const p = m.players.find((x) => x.id === r.id) || {};
+        const base = { playerId: r.id, name: r.name, isBot: !!p.isBot, skill: p.skill || null, won: m.winnerId === r.id,
+          legsWon: r.legsWon, setsWon: rs.setsWon[r.id] || 0, darts: r.darts };
+        return m.mode === 'x01'
+          ? Object.assign(base, { avg: +r.avg.toFixed(2), first9: +r.first9.toFixed(2), maxScore: r.maxScore, n180: r.b180, maxCheckout: r.maxCheckout, checkoutPct: +r.checkoutPct.toFixed(2), busts: r.busts, locks: r.locks })
+          : Object.assign(base, { mpr: +r.mpr.toFixed(2), marks: r.marks, points: r.points });
+      }),
+    };
+  }
+  function queueUpload(m) {
+    if (!m || m.status !== 'finished') return;
+    store.uploads[m.id] = { pending: true };
+    save();
+    flushUploads();
+  }
+  let flushing = false;
+  async function flushUploads() {
+    if (!uploadOn() || flushing) return;
+    flushing = true;
+    try {
+      for (const id of Object.keys(store.uploads)) {
+        const u = store.uploads[id];
+        if (!u.pending) continue;
+        const m = matchById(id);
+        if (!m || m.status !== 'finished') { delete store.uploads[id]; save(); continue; }
+        const res = await fetch(UPLOAD_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(uploadPayload(m)) });
+        let ok = res.ok;
+        try { const j = await res.json(); if (j && j.ok === false) ok = false; } catch (e) { /* non-JSON answer */ }
+        if (!ok) break;
+        store.uploads[id] = { pending: false, at: Date.now() };
+        save();
+      }
+    } catch (e) { /* offline or blocked: try again later */ }
+    flushing = false;
+    if (ui.tab === 'settings' && !ui.screen && !ui.sheet) render();
+  }
+  window.addEventListener('online', () => flushUploads());
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') flushUploads(); });
   let wakeLock = null;
   async function updateWakeLock() {
     const want = store.settings.wakeLock && ui.screen === 'game';
@@ -2052,6 +2114,7 @@ if (typeof module !== 'undefined') module.exports = DL;
       </div>
       <h2 class="group-title">Theme</h2>${seg('theme', [['system', 'System'], ['dark', 'Dark'], ['light', 'Light']], s.theme)}
       <h2 class="group-title">Data</h2><div class="group">
+        ${row('Share finished games', uploadConfigured() ? `Uploads each finished match (player names and scores) to the app owner's Google Sheet.${pendingUploads() ? ` ${pendingUploads()} waiting to upload.` : ''}` : IN_ARTIFACT ? 'Uploads happen in the installed app.' : 'Cloud upload is not set up yet.', switchHtml('set-share', store.settings.shareResults !== false, 'set-shareResults', 'Share finished games'))}
         ${row('Saved on this device', persisted === true ? 'Protected from automatic browser cleanup' : persisted === false ? 'This browser may clear it if unused for a while. Keep a backup.' : 'Saved after every dart', `<span class="num" style="color:var(--muted);text-align:right;font-size:13px">${store.matches.filter((m) => m.status === 'finished').length} matches</span>`)}
         <button class="srow" data-act="export"><span class="grow">Export all data (backup)<small>${store.lastBackupAt ? 'Last backup ' + new Date(store.lastBackupAt).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'No backup yet'}. JSON file with players, matches and settings</small></span></button>
         <button class="srow" data-act="import"><span class="grow">Import from JSON<small>Replaces the data on this device</small></span></button>
@@ -2248,7 +2311,7 @@ if (typeof module !== 'undefined') module.exports = DL;
     }
     feedback(m, ev, turn, legEnded, beforeLeg);
     if (!rs.live || !m.players[rs.live.seat].isBot) ui.botFast = false;
-    if (m.status === 'finished') ensurePersist();
+    if (m.status === 'finished') { ensurePersist(); queueUpload(m); }
     if (turn) {
       ui.review = { matchId: m.id, legIndex: beforeLeg, turn, legEnded };
       ui.reviewTimer = setTimeout(endReview, 700);
@@ -2412,6 +2475,7 @@ if (typeof module !== 'undefined') module.exports = DL;
       if (m.status !== 'finished' && m.status !== 'abandoned') store.activeMatchId = store.activeMatchId || m.id;
       ui.sheet = null; ui.edit = null; renderSheet(); render();
       toast('Turn updated');
+      if (m.status === 'finished') queueUpload(m);
     };
     if (changed && !force) {
       confirmBox({ title: 'This edit changes a leg result', message: 'Turns that no longer fit after this change will be removed.', confirm: 'Save edit', danger: true, onConfirm: apply });
@@ -2555,7 +2619,7 @@ if (typeof module !== 'undefined') module.exports = DL;
           <div style="font-size:30px;font-weight:800">${nameHtml(w)}</div><div style="color:var(--muted);font-weight:700;margin-top:4px">${esc(result)}</div>
           <div style="margin-top:8px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><span class="chip">${esc(score)}</span>${isHouse(m) ? `<span class="chip amber">${HOUSE_NAME}</span>` : ''}</div></div>
         ${table}
-        ${matchOver ? `<p class="saved-note">${I.check}Scores and stats saved on this device.${backupStale() ? ` <button class="link-btn" data-act="export">Save a backup file</button>` : ''}</p>` : ''}
+        ${matchOver ? `<p class="saved-note">${I.check}Scores and stats saved on this device${uploadOn() ? ' and shared with the app owner' : ''}.${backupStale() ? ` <button class="link-btn" data-act="export">Save a backup file</button>` : ''}</p>` : ''}
         <div class="btn-row"><button class="pill-btn" data-act="undo">${I.undo}Undo</button>
         ${matchOver ? `<button class="pill-btn" data-act="recap-view">View match</button><button class="pill-btn green" data-act="recap-done">Done</button>` : `<button class="pill-btn green" data-act="sheet-close">Next leg</button>`}</div>` };
     },
@@ -2872,11 +2936,12 @@ if (typeof module !== 'undefined') module.exports = DL;
       r.readAsText(f);
     },
   };
-  ['earlyEnd', 'suggestions', 'wakeLock', 'sound', 'vibration', 'voice'].forEach((k) => {
+  ['earlyEnd', 'suggestions', 'wakeLock', 'sound', 'vibration', 'voice', 'shareResults'].forEach((k) => {
     CHANGE['set-' + k] = (el) => {
       store.settings[k] = el.checked; save();
       if (k === 'wakeLock') updateWakeLock();
       if (k === 'voice' && el.checked) speak('Voice on');
+      if (k === 'shareResults' && el.checked) { store.matches.filter((m) => m.status === 'finished' && !(store.uploads[m.id] && store.uploads[m.id].at)).forEach((m) => (store.uploads[m.id] = { pending: true })); save(); flushUploads(); }
       render();
     };
   });
@@ -3025,6 +3090,7 @@ if (typeof module !== 'undefined') module.exports = DL;
     render();
     updateWakeLock();
     ensurePersist().then(() => { if (ui.tab === 'settings' && !ui.screen) render(); });
+    flushUploads();
     const r = DL.runSelfTests();
     const failed = r.filter((x) => !x.pass);
     try { console.info(`Dart Scoreboard self-tests: ${r.length - failed.length}/${r.length} passed`); failed.forEach((f) => console.warn('FAIL', f.name, f.detail)); } catch (e) { /* ignore */ }
