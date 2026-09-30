@@ -23,6 +23,7 @@ usually within a minute.
 - `manifest.webmanifest`, `icon-*.png`, `sw.js`: home screen install and offline support.
 - `tools/build.py`: builds `index.html` from `src/`.
 - `tools/make-icons.js`: renders the PNG icons from `src/icon.svg` (needs Playwright).
+- `tools/report.js`: turns an app export into a match report and CSVs (see below).
 - `apps-script/Code.gs`, `apps-script/SETUP.md`: the Google Sheet upload endpoint and how to deploy it.
 
 ## Result uploads
@@ -51,6 +52,11 @@ usually within a minute.
   without `<html>`/`<head>`; `tools/build.py` writes both.
 
 ## Matches recorded before uploads
-`data/manual-matches.csv` and `data/manual-player-results.csv` hold two matches from
-2026-09-29 that were played before uploads were connected. Once the Google Sheet is set up,
-paste these rows into its `Matches` and `Player results` tabs.
+`data/` holds the two matches played on 2026-09-29, before uploads were connected, rebuilt
+from the app export with `node tools/report.js <export.json> data`:
+- `REPORT.md`: readable summary (per match, per set, combined totals).
+- `player-stats.csv`: every stat per player per match, plus totals.
+- `legs.csv`, `turns.csv`: every set/leg and every turn with its darts.
+- `sheet-matches.csv`, `sheet-player-results.csv`: paste into the Google Sheet tabs once it exists.
+- `backup.json`: importable in the app (Settings > Import).
+Times are America/New_York.
